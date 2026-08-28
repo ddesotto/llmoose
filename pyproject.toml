@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llmoose"
+version = "0.1.0"
+description = "Research sandbox for benchmarking LLM agents in the Spanish card game Mus"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "ddesotto" }]
+dependencies = []
+
+[project.optional-dependencies]
+train = [
+  "torch>=2.2",
+  "transformers>=4.45",
+  "datasets>=2.20",
+  "accelerate>=0.34",
+  "peft>=0.12",
+]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+llmoose-generate = "llmoose.cli:generate_command"
+llmoose-train = "llmoose.cli:train_command"
+llmoose-evaluate = "llmoose.cli:evaluate_command"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
