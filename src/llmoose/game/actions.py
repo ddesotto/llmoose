@@ -103,6 +103,8 @@ class ActionCodec:
         return self._ids[action]
 
     def decode(self, action_id: int) -> Action:
+        if type(action_id) is not int or not 0 <= action_id < self.size:
+            raise ValueError("action ID must be an integer in the codec range")
         return self._actions[action_id]
 
     def mask(self, legal: Tuple[Action, ...]) -> Tuple[bool, ...]:
