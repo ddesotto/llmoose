@@ -1,9 +1,8 @@
-"""Deterministic Mus environment components."""
+"""State, actions, and game engine"""
 
 from llmoose.game.actions import Action, ActionCodec, ActionKind
 from llmoose.game.engine import IllegalAction, apply_action, legal_actions
 from llmoose.game.state import GameState, Phase, Seat, new_game
-from llmoose.rules.ruleset import Ruleset
 
 __all__ = [
     "Action",
@@ -12,7 +11,6 @@ __all__ = [
     "GameState",
     "IllegalAction",
     "Phase",
-    "Ruleset",
     "Seat",
     "apply_action",
     "legal_actions",
