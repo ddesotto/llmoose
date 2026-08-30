@@ -61,10 +61,11 @@ def test_resetting_to_a_hand_deals_what_a_played_match_would_have_dealt() -> Non
     policy = ConservativePolicy(ActionCodec(ruleset.target_score))
 
     env = MusEnv(ruleset, seed=12)
-    result = env.step(policy.act(env.reset()))
-    while result.info["hand_number"] != 3:
+    observation = env.reset()
+    while env.state.hand_number != 3:
+        result = env.step(policy.act(observation))
         assert not result.terminated, "the match ended before reaching hand 3"
-        result = env.step(policy.act(result.observation))
+        observation = result.observation
     played = env.state
 
     direct = MusEnv(ruleset, seed=12, episode=EnvEpisode.HAND)
@@ -78,6 +79,49 @@ def test_resetting_to_a_hand_deals_what_a_played_match_would_have_dealt() -> Non
 def test_resetting_to_a_negative_hand_number_is_rejected() -> None:
     with pytest.raises(ValueError, match="hand_number"):
         MusEnv(seed=1).reset(hand_number=-1)
+
+
+def test_a_hand_episode_ends_with_that_hand_and_reports_its_score_change() -> None:
+    ruleset = Ruleset(target_score=40)
+    policy = ConservativePolicy(ActionCodec(ruleset.target_score))
+
+    env = MusEnv(ruleset, seed=12, episode=EnvEpisode.HAND)
+    observation = env.reset(hand_number=3)
+    while True:
+        result = env.step(policy.act(observation))
+        if result.terminated:
+            break
+        assert result.info["hand_number"] == 3, "the episode outlived its hand"
+        observation = result.observation
+
+    assert result.observation is None
+    assert result.info["hand_number"] == 3
+    assert env.state.hand_number == 4, "the engine deals on past the finished hand"
+    assert result.info["hand_reward"] == tuple(
+        float(score) for score in result.info["scores"]
+    )
+    assert any(result.info["hand_reward"]), "a hand awards stones to someone"
+
+
+def test_a_match_episode_reports_a_hand_reward_at_every_hand_boundary() -> None:
+    ruleset = Ruleset(target_score=40)
+    policy = ConservativePolicy(ActionCodec(ruleset.target_score))
+
+    env = MusEnv(ruleset, seed=12)
+    observation = env.reset()
+    hand_rewards = []
+    while True:
+        result = env.step(policy.act(observation))
+        if "hand_reward" in result.info:
+            hand_rewards.append(result.info["hand_reward"])
+        if result.terminated:
+            break
+        observation = result.observation
+
+    assert len(hand_rewards) == env.state.hand_number + 1
+    assert tuple(sum(team) for team in zip(*hand_rewards)) == tuple(
+        float(score) for score in env.state.scores
+    )
 
 
 def test_trace_round_trip_and_replay(tmp_path) -> None:

@@ -96,7 +96,7 @@ class MusEnv:
         return self._next_observation()
 
     def step(self, action: ActionInput) -> StepResult:
-        """Apply an action object or action ID for the currently acting seat."""
+        """Apply an action object or action ID for the currently acting seat. """
 
         before = self.state
         if before.phase is Phase.COMPLETE:
@@ -109,14 +109,23 @@ class MusEnv:
         reward = tuple(
             float(new - old) for new, old in zip(after.scores, before.scores)
         )
-        terminated = after.phase is Phase.COMPLETE
+        match_over = after.phase is Phase.COMPLETE
+        hand_over = match_over or after.hand_number != self._episode_hand
+        terminated = match_over or (hand_over and self.episode is EnvEpisode.HAND)
         info = {
             "action": structured_action,
             "actor": before.current_seat,
             "scores": after.scores,
-            "hand_number": after.hand_number,
+            "hand_number": before.hand_number,
             "lance_results": after.lance_results,
         }
+        if hand_over:
+            info["hand_reward"] = tuple(
+                float(new - old)
+                for new, old in zip(after.scores, self._hand_start_scores)
+            )
+            self._episode_hand = after.hand_number
+            self._hand_start_scores = after.scores
         return StepResult(
             observation=None if terminated else self._next_observation(),
             reward=reward,
