@@ -43,6 +43,12 @@ def mano_for(dealer: Seat) -> Seat:
     return Seat((int(dealer) - 1) % len(SEATS))
 
 
+def dealer_for(initial_dealer: Seat, hand_number: int) -> Seat:
+    """Return the dealer for a given hand number, counting from the first one."""
+
+    return Seat((int(initial_dealer) + hand_number) % len(SEATS))
+
+
 def priority_from_mano(mano: Seat) -> Tuple[Seat, ...]:
     """Return table priority order, with mano first for ties."""
 
