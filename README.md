@@ -29,7 +29,9 @@ winner=team-0 scores=(6, 2) actions=21 events=30
 
 
 # References
-References: Poker work such as [RLCard](https://github.com/datamllab/rlcard),
-[DeepStack](https://pubmed.ncbi.nlm.nih.gov/28254783/), and
-[ReBeL](https://proceedings.neurips.cc/paper/2020/hash/c61f571dbd2fb949d3fe5ae1608dd48b-Abstract.html)
-provide a previous example supporting this model.
+- [RLCard](https://github.com/datamllab/rlcard),
+- [DeepStack](https://pubmed.ncbi.nlm.nih.gov/28254783/)
+- [ReBeL](https://proceedings.neurips.cc/paper/2020/hash/c61f571dbd2fb949d3fe5ae1608dd48b-Abstract.html)
+- [SPIRAL](https://arxiv.org/abs/2506.24119) (self-play multi-turn RL on text games, Qwen3 base models),
+- [TextArena](https://github.com/TextArena/TextArena) (Gym-style text-game interface)
+- [Liquid's TRL guide](https://docs.liquid.ai/lfm/fine-tuning/trl)
