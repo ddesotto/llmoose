@@ -66,9 +66,9 @@ file of episodes that a `datasets.load_dataset("json", ...)` call can read.
 
 **Depends on:** nothing.
 
-- [ ] Add `trl` and `vllm` to the `train` optional-dependency group in
+- [X] Add `trl` and `vllm` to the `train` optional-dependency group in
       `pyproject.toml` .
-- [ ] Remove `src/llmoose/agents/transformer.py`..
+- [X] Remove `src/llmoose/agents/transformer.py`. (!! was already removed !!)
 
 **Done when:** `pip install -e '.[train]'` gives a working TRL + vLLM environment.
 
