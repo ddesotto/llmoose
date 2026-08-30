@@ -44,18 +44,18 @@ Keep them as separate types; do not overload `MatchTrace`.
 
 Followinbg SPIRAL: terminal return broadcast to every one of that seat's turns, **no discounting**.
 
-- [ ] New `src/llmoose/training/trajectories.py` with a `TurnRecord`
+- [X] New `src/llmoose/training/trajectories.py` with a `TurnRecord`
       (`seat`, `mano_offset`, `phase`, `prompt_text`, `legal_ids`, `chosen_id`)
       and an `Episode` (`turns`, `team_return`, `seed`, `hand_number`).
-- [ ] `mano_offset = (seat - mano) % 4` — position relative to mano, not the
+- [X] `mano_offset = (seat - mano) % 4` — position relative to mano, not the
       absolute seat. TASK-08 keys its baseline on this.
-- [ ] `collect_episode(env, policies) -> tuple[Episode, ...]`, one episode per
+- [X] `collect_episode(env, policies) -> tuple[Episode, ...]`, one episode per
       seat, sharing the same played hand.
-- [ ] Broadcast the hand's team stone differential to every turn that seat
+- [X] Broadcast the hand's team stone differential to every turn that seat
       played; store the raw differential, do not normalize here.
-- [ ] JSONL writer/reader — one episode per line, so datasets append cheaply.
-- [ ] Test: turn counts per seat sum to the hand's action count.
-- [ ] Test: returns are equal and opposite between the two partnerships.
+- [X] JSONL writer/reader — one episode per line, so datasets append cheaply.
+- [X] Test: turn counts per seat sum to the hand's action count.
+- [X] Test: returns are equal and opposite between the two partnerships.
 
 **Done when:** self-play with the existing `HeuristicPolicy` produces a JSONL
 file of episodes that a `datasets.load_dataset("json", ...)` call can read.
