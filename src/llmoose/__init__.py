@@ -2,7 +2,7 @@
 
 from llmoose.game.actions import Action, ActionCodec, ActionKind
 from llmoose.game.engine import IllegalAction, apply_action, legal_actions
-from llmoose.game.environment import MusEnv, StepResult
+from llmoose.game.environment import EnvEpisode, MusEnv, StepResult
 from llmoose.game.state import GameState, Phase, Seat, new_game
 from llmoose.rules.ruleset import Ruleset
 
@@ -10,6 +10,7 @@ __all__ = [
     "Action",
     "ActionCodec",
     "ActionKind",
+    "EnvEpisode",
     "GameState",
     "IllegalAction",
     "MusEnv",

@@ -2,7 +2,7 @@ import pytest
 
 from llmoose.agents.baselines import ConservativePolicy, HeuristicPolicy
 from llmoose.benchmark import DealSuite, baseline_factory, run_benchmark
-from llmoose.game import MusEnv
+from llmoose.game import EnvEpisode, MusEnv
 from llmoose.game.actions import ActionCodec
 from llmoose.game.state import SEATS
 from llmoose.rules.ruleset import Ruleset
@@ -44,6 +44,14 @@ def test_environment_rejects_out_of_range_or_non_integer_action_ids(action_id) -
 
     with pytest.raises(ValueError, match="action ID"):
         env.step(action_id)
+
+
+def test_environment_rejects_an_unknown_episode_granularity() -> None:
+    assert MusEnv(seed=1).episode is EnvEpisode.MATCH
+    assert MusEnv(seed=1, episode="hand").episode is EnvEpisode.HAND
+
+    with pytest.raises(ValueError):
+        MusEnv(seed=1, episode="hnd")
 
 
 def test_trace_round_trip_and_replay(tmp_path) -> None:

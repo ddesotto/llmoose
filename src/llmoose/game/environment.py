@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Mapping, Optional, Tuple, Union
 
 from llmoose.game.actions import Action, ActionCodec
@@ -12,6 +13,13 @@ from llmoose.observations.core import Observation, observe
 from llmoose.rules.ruleset import Ruleset
 
 ActionInput = Union[Action, int]
+
+
+class EnvEpisode(str, Enum):
+    """How much play one episode covers: a whole match, or a single hand."""
+
+    MATCH = "match"
+    HAND = "hand"
 
 
 @dataclass(frozen=True)
@@ -38,11 +46,13 @@ class MusEnv:
         ruleset: Optional[Ruleset] = None,
         seed: int = 0,
         dealer: Seat = Seat.NORTH,
+        episode: Union[EnvEpisode, str] = EnvEpisode.MATCH,
     ) -> None:
         self.ruleset = ruleset or Ruleset()
         self.codec = ActionCodec(self.ruleset.target_score)
         self.seed = seed
-        self.dealer = dealer
+        self.initial_dealer = dealer
+        self.episode = EnvEpisode(episode)
         self._state: Optional[GameState] = None
 
     @property
@@ -63,8 +73,8 @@ class MusEnv:
         if seed is not None:
             self.seed = seed
         if dealer is not None:
-            self.dealer = dealer
-        self._state = new_game(self.seed, self.ruleset, self.dealer)
+            self.initial_dealer = dealer
+        self._state = new_game(self.seed, self.ruleset, self.initial_dealer)
         return self._next_observation()
 
     def step(self, action: ActionInput) -> StepResult:
