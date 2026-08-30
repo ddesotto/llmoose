@@ -12,17 +12,17 @@ An episode is currently a whole match to 40 points, with only the win/loss bit o
 
 We just need to expose it in `MusEnv`.
 
-- [ ] Add `MusEnv(episode="match" | "hand")`, defaulting to `"match"` so
+- [X] Add `MusEnv(episode="match" | "hand")`, defaulting to `"match"` so
       nothing existing changes behaviour.
-- [ ] In `"hand"` mode, terminate when `hand_number` increments or the match
+- [X] In `"hand"` mode, terminate when `hand_number` increments or the match
       completes, whichever comes first.
-- [ ] Report the hand's stone differential per team in `StepResult.info`
+- [X] Report the hand's stone differential per team in `StepResult.info`
       (`hand_reward`), separate from the existing per-transition `reward`.
-- [ ] Add `MusEnv.reset(seed=..., hand_number=...)` so a specific hand can be
+- [X] Add `MusEnv.reset(seed=..., hand_number=...)` so a specific hand can be
       dealt directly, without playing the hands before it.
-- [ ] Test: the same `(seed, hand_number)` deals identical hands regardless of
+- [X] Test: the same `(seed, hand_number)` deals identical hands regardless of
       how the match reached that point.
-- [ ] Test: a `"hand"` episode terminates within one hand and its `hand_reward`
+- [X] Test: a `"hand"` episode terminates within one hand and its `hand_reward`
       sums to the score change.
 
 **Done when:** a caller can loop `reset(seed=n, hand_number=k)` -> play -> read a team reward, on a per-hand basis.
