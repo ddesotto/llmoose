@@ -8,7 +8,7 @@ from typing import Mapping, Optional, Tuple, Union
 
 from llmoose.game.actions import Action, ActionCodec
 from llmoose.game.engine import apply_action
-from llmoose.game.state import GameState, Phase, Seat, new_game
+from llmoose.game.state import GameState, Phase, Seat, deal_hand, dealer_for, new_game
 from llmoose.observations.core import Observation, observe
 from llmoose.rules.ruleset import Ruleset
 
@@ -54,6 +54,8 @@ class MusEnv:
         self.initial_dealer = dealer
         self.episode = EnvEpisode(episode)
         self._state: Optional[GameState] = None
+        self._hand_start_scores: Tuple[int, int] = (0, 0)
+        self._episode_hand: int = 0
 
     @property
     def state(self) -> GameState:
@@ -66,15 +68,31 @@ class MusEnv:
         return self.codec.size
 
     def reset(
-        self, seed: Optional[int] = None, dealer: Optional[Seat] = None
+        self,
+        seed: Optional[int] = None,
+        dealer: Optional[Seat] = None,
+        hand_number: int = 0,
     ) -> Observation:
-        """Start a deterministic match and return the first actor's observation."""
+        """Deal an episode's opening state and return the first actor's observation."""
 
+        if hand_number < 0:
+            raise ValueError("hand_number must be non-negative")
         if seed is not None:
             self.seed = seed
         if dealer is not None:
             self.initial_dealer = dealer
-        self._state = new_game(self.seed, self.ruleset, self.initial_dealer)
+
+        if hand_number == 0:
+            self._state = new_game(self.seed, self.ruleset, self.initial_dealer)
+        else:
+            self._state = deal_hand(
+                seed=self.seed,
+                ruleset=self.ruleset,
+                dealer=dealer_for(self.initial_dealer, hand_number),
+                hand_number=hand_number,
+            )
+        self._hand_start_scores = self._state.scores
+        self._episode_hand = self._state.hand_number
         return self._next_observation()
 
     def step(self, action: ActionInput) -> StepResult:

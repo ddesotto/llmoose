@@ -54,6 +54,32 @@ def test_environment_rejects_an_unknown_episode_granularity() -> None:
         MusEnv(seed=1, episode="hnd")
 
 
+def test_resetting_to_a_hand_deals_what_a_played_match_would_have_dealt() -> None:
+    """A hand of a seed is the same hand however the match reached it."""
+
+    ruleset = Ruleset(target_score=40)
+    policy = ConservativePolicy(ActionCodec(ruleset.target_score))
+
+    env = MusEnv(ruleset, seed=12)
+    result = env.step(policy.act(env.reset()))
+    while result.info["hand_number"] != 3:
+        assert not result.terminated, "the match ended before reaching hand 3"
+        result = env.step(policy.act(result.observation))
+    played = env.state
+
+    direct = MusEnv(ruleset, seed=12, episode=EnvEpisode.HAND)
+    direct.reset(hand_number=3)
+
+    assert dict(direct.state.hands) == dict(played.hands)
+    assert direct.state.mano is played.mano
+    assert direct.state.stock == played.stock
+
+
+def test_resetting_to_a_negative_hand_number_is_rejected() -> None:
+    with pytest.raises(ValueError, match="hand_number"):
+        MusEnv(seed=1).reset(hand_number=-1)
+
+
 def test_trace_round_trip_and_replay(tmp_path) -> None:
     trace = trace_from_match(_conservative_match(), {"policy": "conservative"})
     path = tmp_path / "match.json"
