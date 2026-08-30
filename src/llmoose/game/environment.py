@@ -96,7 +96,7 @@ class MusEnv:
         return self._next_observation()
 
     def step(self, action: ActionInput) -> StepResult:
-        """Apply an action object or action ID for the currently acting seat. """
+        """Apply an action object or action ID for the currently acting seat."""
 
         before = self.state
         if before.phase is Phase.COMPLETE:

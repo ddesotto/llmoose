@@ -7,7 +7,7 @@ name = "llmoose"
 version = "0.1.0"
 description = "Research sandbox for benchmarking LLM agents in the Spanish card game Mus"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "ddesotto" }]
 dependencies = []
@@ -19,6 +19,8 @@ train = [
   "datasets>=2.20",
   "accelerate>=0.34",
   "peft>=0.12",
+  "trl>=1.12.0",
+  "vllm>=0.28.0",
 ]
 dev = ["pytest>=8", "ruff>=0.6"]
 
@@ -32,7 +34,7 @@ where = ["src"]
 testpaths = ["tests"]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I"]
