@@ -56,6 +56,7 @@ class MusEnv:
         self._state: Optional[GameState] = None
         self._hand_start_scores: Tuple[int, int] = (0, 0)
         self._episode_hand: int = 0
+        self._terminated = False
 
     @property
     def state(self) -> GameState:
@@ -93,14 +94,15 @@ class MusEnv:
             )
         self._hand_start_scores = self._state.scores
         self._episode_hand = self._state.hand_number
+        self._terminated = False
         return self._next_observation()
 
     def step(self, action: ActionInput) -> StepResult:
         """Apply an action object or action ID for the currently acting seat."""
 
         before = self.state
-        if before.phase is Phase.COMPLETE:
-            raise RuntimeError("Cannot step a completed match; call reset()")
+        if self._terminated:
+            raise RuntimeError("Cannot step a completed episode; call reset()")
         structured_action = (
             self.codec.decode(action) if isinstance(action, int) else action
         )
@@ -112,6 +114,7 @@ class MusEnv:
         match_over = after.phase is Phase.COMPLETE
         hand_over = match_over or after.hand_number != self._episode_hand
         terminated = match_over or (hand_over and self.episode is EnvEpisode.HAND)
+        self._terminated = terminated
         info = {
             "action": structured_action,
             "actor": before.current_seat,

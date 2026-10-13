@@ -3,8 +3,8 @@ import pytest
 from llmoose.agents.baselines import ConservativePolicy, HeuristicPolicy
 from llmoose.benchmark import DealSuite, baseline_factory, run_benchmark
 from llmoose.game import EnvEpisode, MusEnv
-from llmoose.game.actions import ActionCodec
-from llmoose.game.state import SEATS
+from llmoose.game.actions import Action, ActionCodec, ActionKind
+from llmoose.game.state import SEATS, Phase
 from llmoose.rules.ruleset import Ruleset
 from llmoose.simulation import (
     load_trace,
@@ -122,6 +122,30 @@ def test_a_match_episode_reports_a_hand_reward_at_every_hand_boundary() -> None:
     assert tuple(sum(team) for team in zip(*hand_rewards)) == tuple(
         float(score) for score in env.state.scores
     )
+
+
+@pytest.mark.parametrize("episode", (EnvEpisode.HAND, EnvEpisode.MATCH))
+def test_a_completed_episode_rejects_actions_until_reset(episode) -> None:
+    env = MusEnv(Ruleset(target_score=40), seed=12, episode=episode)
+    policy = ConservativePolicy(env.codec)
+    observation = env.reset()
+    while True:
+        result = env.step(policy.act(observation))
+        if result.terminated:
+            break
+        observation = result.observation
+
+    completed = env.state
+    assert (completed.phase is Phase.COMPLETE) == (episode is EnvEpisode.MATCH)
+    with pytest.raises(RuntimeError, match="completed episode.*reset"):
+        env.step(Action(ActionKind.NO_MUS))
+    assert env.state is completed
+
+    env.reset()
+    result = env.step(Action(ActionKind.NO_MUS))
+    assert not result.terminated
+    assert result.observation is not None
+    assert env.state.phase is Phase.GRANDE
 
 
 def test_trace_round_trip_and_replay(tmp_path) -> None:

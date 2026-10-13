@@ -169,17 +169,12 @@ def _after_declarations(state: GameState, is_pares: bool) -> GameState:
     declared = state.declared_pares if is_pares else state.declared_juego
     if is_pares:
         if declared:
-            state = _start_or_resolve_lance(state, Lance.PARES, Phase.PARES, declared)
-            if state.current_lance is not None:
-                return state
+            return _start_or_resolve_lance(state, Lance.PARES, Phase.PARES, declared)
         return _begin_juego_declaration(state)
     if declared:
-        state = _start_or_resolve_lance(
+        return _start_or_resolve_lance(
             state, Lance.JUEGO, Phase.JUEGO_OR_PUNTO, declared
         )
-        if state.current_lance is not None:
-            return state
-        return _start_lance(state, Lance.PUNTO, Phase.JUEGO_OR_PUNTO, SEATS)
     return _start_lance(state, Lance.PUNTO, Phase.JUEGO_OR_PUNTO, SEATS)
 
 

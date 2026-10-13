@@ -86,7 +86,8 @@ def test_ruleset_versions_the_next_opposing_seat_bid_response() -> None:
     assert state.current_seat is Seat.NORTH
 
 
-def test_uncontested_pares_scores_every_qualifying_hand_on_the_winning_team() -> None:
+@pytest.mark.parametrize("target_score", (8, 20))
+def test_uncontested_pares_scores_and_preserves_the_next_phase(target_score) -> None:
     state = _state_with_hands(
         {
             Seat.NORTH: _hand(Rank.ACE, Rank.TWO, Rank.REY, Rank.THREE, suit_offset=0),
@@ -96,7 +97,7 @@ def test_uncontested_pares_scores_every_qualifying_hand_on_the_winning_team() ->
             ),
             Seat.WEST: _hand(Rank.FOUR, Rank.FIVE, Rank.SIX, Rank.SEVEN, suit_offset=3),
         },
-        target_score=8,
+        target_score=target_score,
     )
     state = _pass_through_grande_and_chica(state)
     for _ in range(4):
@@ -105,9 +106,19 @@ def test_uncontested_pares_scores_every_qualifying_hand_on_the_winning_team() ->
     assert state.lance_results[-1].lance.value == "pares"
     assert state.lance_results[-1].winning_team == 0
     assert state.lance_results[-1].points == 6
+    assert state.current_lance is None
+    assert state.hand_number == 0
+    if target_score == 8:
+        assert state.phase is Phase.COMPLETE
+        assert state.current_seat is None
+        assert all(not legal_actions(state, seat) for seat in Seat)
+    else:
+        assert state.phase is Phase.DECLARE_JUEGO
+        assert state.current_seat is state.mano
 
 
-def test_uncontested_juego_scores_every_qualifying_hand_on_the_winning_team() -> None:
+@pytest.mark.parametrize("target_score", (8, 20))
+def test_uncontested_juego_scores_and_preserves_the_next_phase(target_score) -> None:
     state = _state_with_hands(
         {
             Seat.NORTH: _hand(
@@ -119,7 +130,7 @@ def test_uncontested_juego_scores_every_qualifying_hand_on_the_winning_team() ->
             ),
             Seat.WEST: _hand(Rank.FOUR, Rank.FIVE, Rank.SIX, Rank.SEVEN, suit_offset=3),
         },
-        target_score=8,
+        target_score=target_score,
     )
     state = _pass_through_grande_and_chica(state)
     for _ in range(4):
@@ -130,6 +141,20 @@ def test_uncontested_juego_scores_every_qualifying_hand_on_the_winning_team() ->
     assert state.lance_results[-1].lance.value == "juego"
     assert state.lance_results[-1].winning_team == 0
     assert state.lance_results[-1].points == 6
+    assert state.current_lance is None
+    assert not any(
+        event.kind == "lance_started" and dict(event.detail)["lance"] == "punto"
+        for event in state.events
+    )
+    if target_score == 8:
+        assert state.phase is Phase.COMPLETE
+        assert state.current_seat is None
+        assert state.hand_number == 0
+        assert all(not legal_actions(state, seat) for seat in Seat)
+    else:
+        assert state.phase is Phase.MUS_VOTE
+        assert state.current_seat is state.mano
+        assert state.hand_number == 1
 
 
 def test_engine_rejects_out_of_turn_and_unavailable_actions() -> None:
