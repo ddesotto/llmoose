@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Optional, Sequence, Tuple
+from typing import Callable, Mapping, Optional, Sequence, Tuple
 
 from llmoose.agents.protocol import Policy
 from llmoose.game.actions import Action, ActionCodec
@@ -11,6 +11,8 @@ from llmoose.game.engine import apply_action
 from llmoose.game.state import SEATS, GameState, Phase, Seat, new_game
 from llmoose.observations.core import observe
 from llmoose.rules.ruleset import Ruleset
+
+TransitionObserver = Callable[[GameState, Action, GameState], None]
 
 
 @dataclass(frozen=True)
@@ -31,8 +33,13 @@ def run_match(
     ruleset: Optional[Ruleset] = None,
     max_steps: int = 10_000,
     dealer: Seat = Seat.NORTH,
+    on_transition: Optional[TransitionObserver] = None,
 ) -> MatchResult:
-    """Run four policies until one partnership reaches the target score."""
+    """Run four policies, optionally reporting each transition to a spectator.
+
+    The observer sees full states, including private hands. Policies still only
+    receive their own observations.
+    """
 
     if set(policies) != set(SEATS):
         raise ValueError("A match needs exactly one policy for every seat")
@@ -46,8 +53,11 @@ def run_match(
         if actor is None:
             raise RuntimeError("A non-terminal state must name a current seat")
         action = policies[actor].act(observe(state, actor, codec))
+        before = state
         state = apply_action(state, action)
         actions.append(action)
+        if on_transition is not None:
+            on_transition(before, action, state)
     winner = 0 if state.scores[0] >= state.ruleset.target_score else 1
     return MatchResult(seed, state.scores, winner, tuple(actions), state, dealer)
 
