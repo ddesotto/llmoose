@@ -28,6 +28,12 @@ class Observation:
     discard_counts: Tuple[int, int, int, int]
     public_events: Tuple[Event, ...]
     legal_action_mask: Tuple[bool, ...]
+    mano: Seat
+    hand_number: int
+    target_score: int
+    stake: int
+    bidding_team: Optional[int]
+    refusal_points: int
 
 
 def observe(
@@ -46,4 +52,10 @@ def observe(
         discard_counts=state.discard_counts,
         public_events=state.events,
         legal_action_mask=codec.mask(legal_actions(state, seat)),
+        mano=state.mano,
+        hand_number=state.hand_number,
+        target_score=state.ruleset.target_score,
+        stake=state.stake,
+        bidding_team=state.bidding_team,
+        refusal_points=state.refusal_points,
     )

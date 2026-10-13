@@ -34,6 +34,7 @@ def run_match(
     max_steps: int = 10_000,
     dealer: Seat = Seat.NORTH,
     on_transition: Optional[TransitionObserver] = None,
+    on_turn: Optional[Callable[[GameState], None]] = None,
 ) -> MatchResult:
     """Run four policies, optionally reporting each transition to a spectator.
 
@@ -52,6 +53,8 @@ def run_match(
         actor = state.current_seat
         if actor is None:
             raise RuntimeError("A non-terminal state must name a current seat")
+        if on_turn is not None:
+            on_turn(state)
         action = policies[actor].act(observe(state, actor, codec))
         before = state
         state = apply_action(state, action)

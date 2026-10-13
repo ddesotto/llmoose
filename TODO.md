@@ -1,5 +1,19 @@
 # TODO
 
+## Current checkpoint
+
+- Engine fixes and spectator CLI are complete (`--watch`, `--step`, per-team policies).
+- `agents/prompt.py` supplies versioned, private-observation prompts and the
+  `<answer>ID</answer>` output contract.
+- `StructuredLLMPolicy` and the OpenRouter-compatible HTTP provider are implemented.
+  The CLI can play an LLM partnership against a baseline and save exact prompts,
+  responses, selected actions, and usage in a separate JSONL decision log.
+- Evaluation defaults to two invalid-output retries and a logged conservative
+  fallback; `--llm-strict` disables both. Forced actions skip inference.
+- Next: try a real OpenRouter model, inspect formatting and strategy, then build
+  mirrored evaluation (TASK-06) and SFT export (TASK-04). Modal/Lambda workers,
+  constrained decoding, and training remain future work.
+
 
 ## TASK-01 — `feat/hand-episodes`
 
@@ -85,13 +99,13 @@ Why? Adheres to formatting, gives RL a non-random starting policy.
 - [ ] `llmoose-export-sft` CLI: run N seeded self-play hands, write
       `{"prompt": <rendered observation>, "completion": "<answer>ID</answer>"}`
       pairs from `render_observation` in `src/llmoose/agents/prompt.py`.
-- [ ] Fix the completion format now and reuse it unchanged in TASK-05 and
+- [X] Fix the completion format now and reuse it unchanged in TASK-05 and
       TASK-08 — a format change mid-project invalidates every checkpoint.
-- [ ] Include `SYSTEM_PROMPT` as the system turn; add seat and mano-offset to
+- [X] Include `SYSTEM_PROMPT` as the system turn; add seat and mano-offset to
       it so the model is role-conditioned from the start (SPIRAL uses
       role-specific system prompts).
-- [ ] Generate at `target_score=8`: 39 actions and 31 decisions/match, versus
-      103 and 167 at 40. Evaluate at 40 later.
+- [ ] Start with `target_score=8` and measure decision counts on the corrected
+      engine. Evaluate at 40 later.
 - [ ] Reference LoRA SFT script under `scripts/` using TRL `SFTTrainer`.
 - [ ] Test: exported records round-trip, and every `completion` names an id
       that was in that turn's legal set.
@@ -114,10 +128,10 @@ This forces split, the retry-and-fallback added to `StructuredLLMPolicy` is corr
       `<answer>…</answer>`.
 - [ ] Local HF/vLLM provider implementing the `LLMProvider` callable, applying
       the mask.
-- [ ] Document and test the two modes explicitly: eval uses
+- [X] Document and test the two modes explicitly: eval uses
       `max_retries=2, fallback_on_invalid=True`; rollouts use
       `max_retries=0, fallback_on_invalid=False`.
-- [ ] Keep `PolicyTelemetry.invalid_outputs` reported in both modes — for a
+- [X] Keep `PolicyTelemetry.invalid_outputs` reported in both modes — for a
       350M model this is the primary early metric.
 - [ ] Test: with masking on, a provider that always samples the highest-logit
       token still returns a legal action.
@@ -214,9 +228,8 @@ standard suite with a confidence interval excluding 0.5.
 ## Backlog
 
 
-- **`feat/anthropic-provider`** — `StructuredLLMPolicy` takes a bare callable
-  and nothing implements it. Needed to compare an SLM against a frontier model,
-  not to train one.
+- **`feat/anthropic-provider`** — Optional direct provider. Frontier-model
+  comparisons can already use OpenRouter through `ChatCompletionProvider`.
 - **`feat/senas`** — `CommunicationMode.DISABLED` is stubbed.
 - **`feat/elo`** — TrueSkill or Elo across checkpoints, once there are enough
   checkpoints so it means something.

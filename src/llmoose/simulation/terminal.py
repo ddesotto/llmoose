@@ -48,7 +48,8 @@ class TerminalSpectator:
     _hand_number: int = field(default=-1, init=False)
     _decisions: int = field(default=0, init=False)
 
-    def __call__(self, before: GameState, action: Action, after: GameState) -> None:
+    def before_action(self, before: GameState) -> None:
+        """Show the hand and pace the turn before a policy (or API) is called."""
         if self._hand_number != before.hand_number:
             self._hand_number = before.hand_number
             print(
@@ -71,6 +72,8 @@ class TerminalSpectator:
                 raise KeyboardInterrupt
         elif self.delay and self._decisions:
             time.sleep(self.delay)
+
+    def __call__(self, before: GameState, action: Action, after: GameState) -> None:
         self._decisions += 1
         phase = (
             before.current_lance.value

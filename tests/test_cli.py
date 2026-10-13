@@ -1,3 +1,6 @@
+import json
+from io import BytesIO
+
 import pytest
 
 from llmoose.cli import play_command
@@ -90,3 +93,149 @@ def test_action_limit_reports_an_incomplete_match(tmp_path, capsys):
     assert "Match stopped:" in output.err
     assert "winner=" not in output.out
     assert not path.exists()
+
+
+def test_llm_match_uses_openrouter_wire_format_and_saves_inspectable_decisions(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-secret")
+    requests = []
+
+    class FakeOpener:
+        def open(self, request, timeout):
+            payload = json.loads(request.data)
+            requests.append(payload)
+            choices = (
+                payload["messages"][1]["content"]
+                .split("Legal actions (ID: meaning):\n")[1]
+                .splitlines()
+            )
+            choices = dict(line.strip().split(": ", 1) for line in choices)
+            chosen = next(
+                (
+                    key
+                    for kind in ("no mus", "pass", "fold")
+                    for key, value in choices.items()
+                    if value == kind
+                ),
+                next(iter(choices)),
+            )
+            return BytesIO(
+                json.dumps(
+                    {
+                        "model": "test/resolved",
+                        "choices": [
+                            {
+                                "message": {"content": f"<answer>{chosen}</answer>"},
+                                "finish_reason": "stop",
+                            }
+                        ],
+                        "usage": {"prompt_tokens": 100, "completion_tokens": 8},
+                    }
+                ).encode()
+            )
+
+    monkeypatch.setattr(
+        "llmoose.agents.providers.build_opener", lambda *_: FakeOpener()
+    )
+    log = tmp_path / "runs" / "decisions.jsonl"
+    trace = tmp_path / "match.json"
+    assert (
+        play_command(
+            [
+                "--seed",
+                "12",
+                "--target-score",
+                "8",
+                "--team-0",
+                "llm",
+                "--team-1",
+                "heuristic",
+                "--model",
+                "test/model",
+                "--watch",
+                "--delay",
+                "0",
+                "--llm-log",
+                str(log),
+                "--trace",
+                str(trace),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr()
+    assert "winner=" in output.out
+    assert "LLM model: test/model" in output.out
+    assert "invalid_outputs=0" in output.err
+    assert requests and all(request["model"] == "test/model" for request in requests)
+    records = [json.loads(line) for line in log.read_text().splitlines()]
+    chosen = [record for record in records if record["status"] == "chosen"]
+    assert len(chosen) == len(requests)
+    assert all(record["seat"] in (0, 2) for record in records)
+    assert all(record["chosen_id"] in record["legal_ids"] for record in records)
+    assert [record["messages"] for record in chosen] == [
+        request["messages"] for request in requests
+    ]
+    assert all(record["model"] == "test/resolved" for record in chosen)
+    assert "test-secret" not in log.read_text()
+    saved = load_trace(trace)
+    assert saved.metadata["model"] == "test/model"
+    assert replay_trace(saved).scores == saved.scores
+
+
+def test_quitting_before_first_llm_turn_makes_no_api_call(monkeypatch, capsys):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-secret")
+    monkeypatch.setattr("builtins.input", lambda _: "q")
+
+    def unexpected(*_):
+        pytest.fail("Quit must happen before requesting inference")
+
+    monkeypatch.setattr("llmoose.agents.providers.build_opener", unexpected)
+    assert play_command(["--policy", "llm", "--model", "test/model", "--step"]) == 130
+    assert "requests=0" in capsys.readouterr().err
+
+
+def test_missing_openrouter_key_fails_before_starting_a_match(monkeypatch, capsys):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    with pytest.raises(SystemExit) as error:
+        play_command(["--policy", "llm", "--model", "test/model"])
+    assert error.value.code == 2
+    assert "Set OPENROUTER_API_KEY" in capsys.readouterr().err
+
+
+def test_strict_cli_stops_and_preserves_invalid_response_log(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-secret")
+
+    class InvalidOpener:
+        def open(self, request, timeout):
+            return BytesIO(b'{"choices":[{"message":{"content":"bad"}}]}')
+
+    monkeypatch.setattr(
+        "llmoose.agents.providers.build_opener", lambda *_: InvalidOpener()
+    )
+    log = tmp_path / "decisions.jsonl"
+    trace = tmp_path / "match.json"
+    with pytest.raises(SystemExit) as error:
+        play_command(
+            [
+                "--policy",
+                "llm",
+                "--model",
+                "test/model",
+                "--llm-strict",
+                "--llm-log",
+                str(log),
+                "--trace",
+                str(trace),
+            ]
+        )
+    assert error.value.code == 1
+    records = [json.loads(line) for line in log.read_text().splitlines()]
+    assert len(records) == 1
+    assert records[0]["status"] == "invalid"
+    assert records[0]["response"] == "bad"
+    assert not trace.exists()
+    assert "requests=1 invalid_outputs=1 fallbacks=0" in capsys.readouterr().err
