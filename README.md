@@ -5,6 +5,53 @@
 
 # Code
 
+Start with three responsibilities:
+
+- **The game** holds the cards and enforces the rules. It knows nothing about
+  HTTP requests or language models.
+- **A player policy** chooses one move from what that seat can see. A heuristic
+  uses Python rules; an LLM policy asks a model. Both expose `act(observation)`.
+- **The match loop** connects them, asking the next player for a move and giving
+  that move to the game engine.
+
+The important part of each turn is just:
+
+```python
+observation = observe(state, actor, codec)
+action = policies[actor].act(observation)
+state = apply_action(state, action)
+```
+
+`codec` translates between numbered menu choices and structured actions such as
+`Action(BET, amount=2)`. `observe` removes hidden information; `apply_action`
+checks legality and produces the next state.
+
+Read the code in this order:
+
+| File | Question it answers |
+| --- | --- |
+| [cli.py](src/llmoose/cli.py) → `play_command` | How are options, players, a match, and output wired together? |
+| [agents/factory.py](src/llmoose/agents/factory.py) → `build_policies` | Who controls each of the four seats? |
+| [simulation/match.py](src/llmoose/simulation/match.py) → `run_match` | What happens on every turn? |
+| [observations/core.py](src/llmoose/observations/core.py) → `observe` | What is this player allowed to know? |
+| [game/engine.py](src/llmoose/game/engine.py) → `apply_action` | What does the chosen move do? |
+
+Once that loop makes sense, follow the LLM path in
+[agents/llm.py](src/llmoose/agents/llm.py): render a prompt, call the provider,
+parse the answer, return an action. Logging lives in
+[simulation/reporting.py](src/llmoose/simulation/reporting.py) and the spectator
+display in [simulation/terminal.py](src/llmoose/simulation/terminal.py).
+
+A human seat would fit at exactly the same boundary: `HumanPolicy.act()` would
+display the private observation, wait for your selection, and return an action.
+That input policy is not implemented yet. The engine and match loop would not
+need to change.
+
+For now, leave `training/` and `benchmark/` until after the turn loop is clear.
+`training/` collects hand episodes and returns; it does not yet update model
+weights. `game/environment.py` wraps the same engine in `reset()` and `step()`
+for that collection. The CLI match runner uses the engine directly.
+
 The project is structured as follows:
 
 ```text
@@ -12,8 +59,8 @@ src/llmoose/
   rules/          cards, pure hand comparison, versioned rulesets
   game/           immutable state, reset/step environment, legal transitions
   observations/   one private, action-masked view per seat
-  agents/         baselines, shared prompts, LLM policy, OpenRouter transport
-  simulation/     seeded matches, JSON traces, deterministic replay
+  agents/         player construction, baselines, prompts, LLM policy and transport
+  simulation/     match loop, terminal display, reporting, traces and replay
   benchmark/      fixed-deal suites and aggregate match reports
   training/       per-seat hand trajectories and JSONL datasets
 ```
@@ -87,29 +134,21 @@ history, bidding context, and the legal action IDs with descriptions. It must
 answer exactly `<answer>ID</answer>`. A forced action, such as a truthful
 declaration, is performed without an API request.
 
-By default, invalid output gets up to two corrective retries, then an explicit
-conservative fallback. Invalid responses and fallbacks are reported on stderr,
-along with aggregate request and error counts. Connection or API failures stop
-the match instead of silently substituting a move. `--llm-strict` disables
-retries and fallback, stopping on the first invalid response. Use strict mode
-for future on-policy rollouts; constrained decoding is not implemented yet.
+Invalid responses get up to two retries, then a logged conservative fallback.
+Use `--llm-strict` to stop on the first invalid response. Connection or API
+failures always stop the match.
 
-The JSONL decision log contains the exact messages for each attempt, response
-text, legal IDs, selected action, requested and returned model names, finish
-reason, and provider-reported usage (including cost when supplied). Forced
-actions, invalid attempts, fallbacks, and provider errors have distinct status
-values. It is written incrementally, so completed records survive an interrupted
-match. Each invocation replaces the selected log file. API keys are not logged.
-Replay traces contain the actual moves and can replay without a model call;
-a live model run with the same deal seed may choose different moves.
+`--llm-log` saves prompts, responses, chosen actions, and usage as JSONL.
+Records are saved as the match runs; each invocation overwrites the file.
+`--trace` saves moves for replay without model calls. See
+[the policy](src/llmoose/agents/llm.py) and
+[reporting](src/llmoose/simulation/reporting.py) for log details.
 
-Use `--max-tokens` (default 1024), `--temperature` (default 0), and `--timeout`
-(default 60 seconds) to tune requests. Models that spend the token allowance
-on reasoning may return no answer; inspect `finish_reason` in the log and
-increase `--max-tokens` if needed.
+Request settings are `--max-tokens` (1024), `--temperature` (0), and `--timeout`
+(60 seconds). If reasoning uses up the token budget before an answer, increase
+`--max-tokens`.
 
-For a future local or hosted OpenAI-compatible inference server, supply its API
-base URL and served model name:
+To use a local or hosted OpenAI-compatible server:
 
 ```bash
 llmoose-play --team-0 llm --team-1 heuristic --watch \
@@ -117,13 +156,7 @@ llmoose-play --team-0 llm --team-1 heuristic --watch \
 ```
 
 Custom endpoints use no key unless `--api-key-env YOUR_KEY_VARIABLE` is supplied.
-The prompt renderer and policy are independent of this HTTP transport, so
-training and inference workers on Modal or Lambda can reuse them. Those cloud
-integrations and the training loop remain future work.
-
-For heuristic training examples, pass
-`render=llmoose.agents.prompt.render_prompt` to `collect_episode`. This includes
-the same role-conditioned system text and observation used during inference.
+Training and cloud integration plans are in [TODO.md](TODO.md).
 
 # References
 - [RLCard](https://github.com/datamllab/rlcard),
