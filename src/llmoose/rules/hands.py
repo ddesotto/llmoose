@@ -94,9 +94,17 @@ def evaluate_hand(cards: Sequence[Card]) -> HandValue:
 
 
 def _evaluate_pares(ranks: Sequence[int]) -> PairValue:
+
     counts = Counter(ranks)
-    groups = sorted(counts.items(), key=lambda item: item[0], reverse=True)
-    multiplicities = sorted(counts.values(), reverse=True)
+    # We sort:
+    # - Higher count first (second arg)
+    # - Higher rank second (first arg)
+    groups = sorted(
+        counts.items(),
+        key=lambda group: (group[1], group[0]),
+        reverse=True,
+    )
+    multiplicities = [count for _, count in groups]
 
     if multiplicities == [4]:
         rank = groups[0][0]
@@ -106,8 +114,8 @@ def _evaluate_pares(ranks: Sequence[int]) -> PairValue:
     if multiplicities == [3, 1]:
         return PairValue(PairKind.MEDIAS, (groups[0][0],))
     if multiplicities == [2, 1, 1]:
-        pair_rank = next(rank for rank, count in groups if count == 2)
-        return PairValue(PairKind.SIMPLE, (pair_rank,))
+        return PairValue(PairKind.SIMPLE, (groups[0][0],))
+
     return PairValue(PairKind.NONE)
 
 
