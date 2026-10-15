@@ -7,6 +7,40 @@ from llmoose.cli import play_command
 from llmoose.simulation.traces import load_trace, replay_trace
 
 
+@pytest.mark.parametrize("model_override", [None, "shell/model", "cli/model"])
+def test_dotenv_loads_before_model_and_credentials_are_resolved(
+    tmp_path, monkeypatch, model_override
+):
+    # Register restoration before load_dotenv mutates the process environment.
+    for name in ("OPENROUTER_API_KEY", "OPENROUTER_MODEL"):
+        monkeypatch.setenv(name, "temporary")
+        monkeypatch.delenv(name)
+    (tmp_path / ".env").write_text(
+        "# Local game settings\n"
+        'OPENROUTER_API_KEY="file-secret"\n'
+        "OPENROUTER_MODEL='file/model'\n"
+    )
+    if model_override is not None:
+        monkeypatch.setenv("OPENROUTER_MODEL", "shell/model")
+        monkeypatch.setenv("OPENROUTER_API_KEY", "shell-secret")
+    args = ["--policy", "llm", "--step"]
+    if model_override == "cli/model":
+        args += ["--model", model_override]
+    providers = []
+    from llmoose.agents.providers import ChatCompletionProvider
+
+    def capture_provider(**settings):
+        provider = ChatCompletionProvider(**settings)
+        providers.append(provider)
+        return provider
+
+    monkeypatch.setattr("llmoose.cli.ChatCompletionProvider", capture_provider)
+    monkeypatch.setattr("builtins.input", lambda _: "q")
+    assert play_command(args) == 130  # Validate configuration without an API call.
+    assert providers[0].model == (model_override or "file/model")
+    assert providers[0].api_key == ("shell-secret" if model_override else "file-secret")
+
+
 def test_watching_preserves_match_and_trace(tmp_path, capsys):
     quiet_path = tmp_path / "quiet.json"
     watch_path = tmp_path / "watch.json"

@@ -219,6 +219,48 @@ def test_openrouter_request_and_completion_metadata(monkeypatch):
     assert "test-secret" not in repr(provider)
 
 
+@pytest.mark.parametrize("include_reasoning", [False, True])
+def test_reasoning_is_preserved_separately_from_the_action(
+    monkeypatch, include_reasoning
+):
+    details = [
+        {"type": "reasoning.summary", "summary": "The current hand favors cutting mus."}
+    ]
+    calls = install_transport(
+        monkeypatch,
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": "<answer>1</answer>",
+                        "reasoning": "The current hand favors cutting mus.",
+                        "reasoning_details": details,
+                    }
+                }
+            ],
+            "usage": {
+                "completion_tokens": 40,
+                "completion_tokens_details": {"reasoning_tokens": 30},
+            },
+        },
+    )
+    env, observation = opening()
+    records = []
+    provider = ChatCompletionProvider(
+        "model", api_key="test", include_reasoning=include_reasoning
+    )
+    policy = StructuredLLMPolicy(env.codec, provider, on_record=records.append)
+    assert policy.act(observation).kind is ActionKind.NO_MUS
+    body = json.loads(calls[0][0].data)
+    if include_reasoning:
+        assert body["reasoning"] == {"enabled": True, "exclude": False}
+    else:
+        assert "reasoning" not in body
+    assert records[0]["reasoning"] == "The current hand favors cutting mus."
+    assert records[0]["reasoning_details"] == details
+    assert records[0]["response"] == "<answer>1</answer>"
+
+
 @pytest.mark.parametrize(
     "payload",
     [

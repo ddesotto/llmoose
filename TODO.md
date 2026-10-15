@@ -1,238 +1,412 @@
 # TODO
 
+Build **MooseBench**: a reproducible Mus benchmark and a sandbox for teaching small
+language models the rules, distilling stronger players, and improving through play.
+Measure rule understanding, gameplay, and inference efficiency separately.
+
+Start with the [learning guide](docs/README.md). Each task below links to an
+explanation, evidence, or design. Unchecked items are planned capabilities; proposed
+commands in the guides are not installed commands. Existing task IDs are retained.
+
+The [HTML workspace](docs/index.html) presents this roadmap interactively with
+browser-local progress and notes. Its checkmarks do not modify this source.
+
 ## Current checkpoint
 
-- Engine fixes and spectator CLI are complete (`--watch`, `--step`, per-team policies).
-- `agents/prompt.py` supplies versioned, private-observation prompts and the
-  `<answer>ID</answer>` output contract.
-- `StructuredLLMPolicy` and the OpenRouter-compatible HTTP provider are implemented.
-  The CLI can play an LLM partnership against a baseline and save exact prompts,
-  responses, selected actions, and usage in a separate JSONL decision log.
-- Evaluation defaults to two invalid-output retries and a logged conservative
-  fallback; `--llm-strict` disables both. Forced actions skip inference.
-- Next: try a real OpenRouter model, inspect formatting and strategy, then build
-  mirrored evaluation (TASK-06) and SFT export (TASK-04). Modal/Lambda workers,
-  constrained decoding, and training remain future work.
+- [x] Deterministic game engine, legal masks, private observations, scripted players,
+      spectator CLI, match replay, and hand/match environment modes.
+- [x] Per-seat hand episodes and JSONL serialization; these are collection
+      foundations, not an implemented optimizer or RL training pipeline.
+- [x] LLM transport and policy, versioned prompts, forced-action bypass, exact
+      conversation logs, incremental moves, reports, and inspection.
+- [x] Basic Python benchmark function with seed suites and team outcomes.
+- [x] Optional training dependencies declared; GPU installation/training unverified.
+- [x] Repository review and learning artifacts added on 2026-10-14. See the
+      [prompt/game audit](docs/game-and-prompt.md) and [evidence snapshot](docs/evidence/review-2026-10-14.json).
+- [x] Offline HTML workspace with roadmap filters/checklists, guide reading notes,
+      evidence inspection, a synthetic trace explorer, and progress export/import.
+      Regenerate with `.venv/bin/python scripts/build_dashboard.py` after source edits.
 
+The existing 117 tests pass, but the audit reproduces an uncovered medias ranking
+bug. Saved runs verify the workflow, not a model ranking: both use seed 12; the
+short game won mostly through uncontested juego, while the longer game lost with
+all 57 inference decisions syntactically valid. Rule correctness, clear instructions,
+and durable artifacts must precede expensive data generation.
 
-## TASK-01 — `feat/hand-episodes`
+## Milestones and dependencies
 
-**Depends on:** nothing.
+| Milestone | Tasks | Acceptance gate |
+| --- | --- | --- |
+| Explain and stabilize play | 09, 10 | Independently checked rules and self-contained player inputs |
+| Preserve experiments | 18 | Versioned, linked, recoverable records; existing runs remain readable |
+| Compare models | 11, 06, 12 | Two distinct models, mirrored suites, uncertainty, failure accounting |
+| Teach an SLM | 13, 14, 04, 05 | Reproducible datasets and improved held-out knowledge/gameplay |
+| Learn through play | 15, 07, 08 | Verified RL updates and improvement over the SFT parent |
+| Expand and reproduce | 16, 17 | Cross-play, human play, and reusable release artifacts |
 
-An episode is currently a whole match to 40 points, with only the win/loss bit of information.
+TASK-18 can begin alongside the rules audit; its schema must record the eventual
+rules and prompt versions. Its core recording/validation gate precedes benchmark
+execution; downstream export adapters are implemented with their training tasks.
+Existing-model evaluation does not depend on training.
+Use development suites during iteration and reserve test suites for final comparisons.
 
-`deal_hand` in `src/llmoose/game/state.py` already derives the deal from
-`Random(f"{seed}:{hand_number}")`.
+## TASK-09 — Validate the game contract
 
-We just need to expose it in `MusEnv`.
+**Priority:** blocking trusted benchmark outcomes and training labels.
+**Guide:** [game and prompt audit](docs/game-and-prompt.md).
 
-- [X] Add `MusEnv(episode="match" | "hand")`, defaulting to `"match"` so
-      nothing existing changes behaviour.
-- [X] In `"hand"` mode, terminate when `hand_number` increments or the match
-      completes, whichever comes first.
-- [X] Report the hand's stone differential per team in `StepResult.info`
-      (`hand_reward`), separate from the existing per-transition `reward`.
-- [X] Add `MusEnv.reset(seed=..., hand_number=...)` so a specific hand can be
-      dealt directly, without playing the hands before it.
-- [X] Test: the same `(seed, hand_number)` deals identical hands regardless of
-      how the match reached that point.
-- [X] Test: a `"hand"` episode terminates within one hand and its `hand_reward`
-      sums to the score change.
+- [ ] Fix `_evaluate_pares`: choose the rank occurring three times, not the highest
+      card. Cover a higher singleton, normalized ranks, and equal triples with
+      different singletons. Current reproducer: `4,4,4,K` incorrectly beats `7,7,7,A`.
+- [ ] Choose and document the intended Mus variant. The current engine resolves
+      every lance immediately; authoritative Mus references defer accepted bets
+      and distinguish them from an accepted órdago. Do not hide this behind a
+      generic “Mus” label or silently change old replay semantics.
+- [ ] Decide scoring for called/folded pares and juego, showdown timing, public
+      card reveals, minimum raises, discards/recycling, and partnership responses.
+      Document explicit deviations from the selected reference rules.
+- [ ] Resolve the engine's equivalence of a numeric bet at the target and órdago.
+      Preserve a distinct action/event flag if semantics differ.
+- [ ] Add independent expected-result fixtures for each comparison, eligibility,
+      tie, betting chain, uncontested award, score threshold, and órdago outcome.
+      Deterministic replay of the same engine is not an independent rules oracle.
+- [ ] Version changed semantics, reconcile misleading code docstrings, and retain
+      provenance for historical datasets/runs.
 
-**Done when:** a caller can loop `reset(seed=n, hand_number=k)` -> play -> read a team reward, on a per-hand basis.
+**Done when:** a frozen rules specification and independent fixtures agree with
+all scoring and transition paths, with known deviations explicitly named.
 
----
+## TASK-10 — Make the player interface self-contained
 
-## TASK-02 — `feat/trajectories`
+**Depends on:** TASK-09 for final semantics.
+**Guide:** [game and prompt audit](docs/game-and-prompt.md).
 
-**Depends on:** TASK-01.
+- [ ] Add a new prompt version without rewriting v1/v2. Explain four-card hands,
+      physical deck composition, normalized rank order, juego threshold, mano,
+      explicit table order, the hand lifecycle, and the partnership win condition.
+- [ ] Define every action and its consequences. Explain pass versus fold, binding
+      team responses, the best eligible individual hand, declarations, and
+      uncontested lances. State whether intrinsic values add to bets.
+- [ ] Explain score timing and that displayed totals already include resolved
+      awards. Include worked comparisons and a bet–raise–fold example.
+- [ ] Render player-facing context instead of unexplained enum labels: active
+      lance, eligible seats, tie order, bidding team, and recipient of refusal points.
+      Mark discard counts as cumulative within the hand; describe contextual actions.
+- [ ] Preserve same-seat private recall of previously seen cards/own discards.
+      Current calls are fresh and contain only current cards plus public history.
+      Keep partners' private memories separate.
+- [ ] Version the renderer/history policy as well as system text. Define context
+      limits and past-hand summaries without silently losing current decision data.
+- [ ] Decide whether hand-evaluation summaries are provided. If so, label and
+      evaluate that assistance consistently rather than calling it learned knowledge.
+- [ ] Check scenarios for coverage and private-information invariance, including
+      recall isolation, forced declarations, and near-target situations.
 
-`MatchTrace` is a replay artifact with actions only - no prompts. 
+**Done when:** a player can explain all offered actions from its input alone,
+without source code or assumed familiarity with a different Mus variant.
 
-For training we need:
-- what the model saw
-- what it chose
-- what it got. 
+## TASK-18 — Durable trace and artifact foundations
 
-Keep them as separate types; do not overload `MatchTrace`.
+**Depends on:** existing recording; coordinate semantics with TASK-09/10.
+**Guide:** [artifacts and traces](docs/artifacts.md).
 
-Followinbg SPIRAL: terminal return broadcast to every one of that seat's turns, **no discounting**.
+Core recording gate:
 
-- [X] New `src/llmoose/training/trajectories.py` with a `TurnRecord`
-      (`seat`, `mano_offset`, `phase`, `prompt_text`, `legal_ids`, `chosen_id`)
-      and an `Episode` (`turns`, `team_return`, `seed`, `hand_number`).
-- [X] `mano_offset = (seat - mano) % 4` — position relative to mano, not the
-      absolute seat. TASK-08 keys its baseline on this.
-- [X] `collect_episode(env, policies) -> tuple[Episode, ...]`, one episode per
-      seat, sharing the same played hand.
-- [X] Broadcast the hand's team stone differential to every turn that seat
-      played; store the raw differential, do not normalize here.
-- [X] JSONL writer/reader — one episode per line, so datasets append cheaply.
-- [X] Test: turn counts per seat sum to the hand's action count.
-- [X] Test: returns are equal and opposite between the two partnerships.
+- [ ] Define a canonical versioned experiment manifest, written before requests,
+      and linked decision/attempt/transition/outcome records. Record observations,
+      exact messages, structured actions, legal IDs, rewards, and provenance.
+- [ ] Use stable run, match, hand, seat, decision, attempt, and event identifiers.
+      Record all policies' decisions, not only LLM calls; distinguish forced,
+      sampled, retried, fallback, failed, interrupted, and unapplied responses.
+- [ ] Preserve raw v1 `match.json`, `moves.jsonl`, `decisions.jsonl`, and `report.json`.
+      Add readers/migrations rather than rewriting evidence. Backfill only facts
+      justified by old files, marking unavailable fields unknown.
+- [ ] Separate evaluator-only state/seed/replay data from seat-visible inputs.
+      A seed can reconstruct hidden hands and must not enter a player prompt or
+      ordinary student input. Keep each seat's private trace scoped to that seat.
+- [ ] Store engine/code and dirty-worktree provenance, rules, prompt/renderer/codec
+      versions, model/tokenizer revisions, dependency lock, parameters, and hashes.
+      Capture provider-returned identifiers and usage without secrets.
+- [ ] Define append durability, request-start records, crash-safe finalization,
+      partial-line recovery, idempotent resume, terminal/truncated status, and checksums.
+      Flushing Python buffers alone is not durable storage against every failure.
+- [ ] Add validation tools: replay consistency, log joins, mask legality,
+      score deltas, missing attempts, schema versions, and hidden-information boundaries.
+- [ ] Define local run/data/model/evaluation directories, retention, compression,
+      backup, indexing, and eventual object-store publishing. Keep small examples
+      in Git and large/private experiment artifacts in managed storage.
 
-**Done when:** self-play with the existing `HeuristicPolicy` produces a JSONL
-file of episodes that a `datasets.load_dataset("json", ...)` call can read.
+Downstream adapters, delivered with TASK-13/14/15 and TASK-04:
 
----
+- [ ] Derive SFT, preference, knowledge-task, and RL datasets from immutable source
+      records with export manifests and hashes. Do not overload a replay trace as
+      a training trajectory; preserve original records when filtering.
 
-## TASK-03 — `chore/train-extras`
+**Core done when:** an experiment can be inspected, replayed, audited, resumed or
+explicitly marked partial with traceable provenance. Export acceptance is checked
+with the corresponding training task, not required to start benchmarking.
 
-**Depends on:** nothing.
+## TASK-11 — MooseBench protocol and model configuration
 
-- [X] Add `trl` and `vllm` to the `train` optional-dependency group in
-      `pyproject.toml` .
-- [X] Remove `src/llmoose/agents/transformer.py`. (!! was already removed !!)
+**Depends on:** TASK-09, TASK-10, TASK-18 core recording gate.
+**Guide:** [benchmark tutorial](docs/benchmark.md).
 
-**Done when:** `pip install -e '.[train]'` gives a working TRL + vLLM environment.
+- [ ] Define the main track: two private instances of the candidate model form a
+      partnership against frozen opponents. Keep unfamiliar-partner evaluation separate.
+- [ ] Add per-team/seat model specifications and independent provider instances.
+      Current CLI/factory shares one provider across all `llm` seats.
+- [ ] Freeze manifests for seeds, dealer schedule, opponents, target, repetitions,
+      rules, prompts, context policy, and limits. Separate smoke/dev/test suites.
+- [ ] Define constrained/unconstrained and reasoning-budget tracks. Record actual
+      tokens, cost coverage, latency, and provider settings; a token cap alone is
+      not a hardware-independent compute budget.
+- [ ] Predeclare invalid-output, fallback, timeout, and nontermination handling.
+      Keep model-only results separate from assisted retry/fallback systems.
+      Retain infrastructure failures and coverage instead of silently dropping games.
+- [ ] Save reproducibility metadata through TASK-18. Hosted calls may vary even
+      when environment traces replay exactly.
 
----
+**Done when:** one manifest fully defines candidate, opponent, information access,
+inference budget, and scoring protocol.
 
-## TASK-04 — `feat/sft-bootstrap`
+## TASK-06 — Mirrored evaluation and comparisons
 
-**Depends on:** TASK-02, TASK-03.
+**Depends on:** TASK-11. Expands the original `feat/mirrored-eval` task.
+**Guide:** [benchmark tutorial](docs/benchmark.md).
 
-Distil `HeuristicPolicy` into the SLM before any RL. 
+- [ ] Run every seed/dealer configuration with both partnership assignments;
+      attribute results to policy identity rather than seat-team number.
+- [ ] Pair initial environment randomness. Explain that later discards/actions
+      can diverge, so mirroring does not guarantee identical complete trajectories.
+- [ ] Add frozen-opponent comparisons and model round robins; scripted baselines
+      are diagnostic opponents, not proof of broad playing strength.
+- [ ] Bootstrap at the seed-group level, retaining mirrors/rotations/repeats
+      together. Report win rates and paired candidate differences with uncertainty.
+- [ ] Report primary win/loss plus stone differential, per-lance outcomes,
+      contested/uncontested awards, legality, fallbacks, failures, usage, and latency.
+      Explain large score overshoots after accepted órdagos.
+- [ ] Provide named suites, machine-readable reports, and a `llmoose-bench` CLI.
+      Predeclare sample sizes or precision goals; smoke runs are not leaderboard evidence.
+- [ ] Test attribution, pairing, and aggregation. Identical deterministic policies
+      with mirrored identity assignments should produce exactly 50%, not a flaky
+      “near 0.5” assertion. Test stochastic behavior separately.
 
-Why? Adheres to formatting, gives RL a non-random starting policy. 
+**Done when:** two different models complete comparable mirrored suites with
+correct attribution, uncertainty, failure accounting, and linked artifacts.
 
-- [ ] `llmoose-export-sft` CLI: run N seeded self-play hands, write
-      `{"prompt": <rendered observation>, "completion": "<answer>ID</answer>"}`
-      pairs from `render_observation` in `src/llmoose/agents/prompt.py`.
-- [X] Fix the completion format now and reuse it unchanged in TASK-05 and
-      TASK-08 — a format change mid-project invalidates every checkpoint.
-- [X] Include `SYSTEM_PROMPT` as the system turn; add seat and mano-offset to
-      it so the model is role-conditioned from the start (SPIRAL uses
-      role-specific system prompts).
-- [ ] Start with `target_score=8` and measure decision counts on the corrected
-      engine. Evaluate at 40 later.
-- [ ] Reference LoRA SFT script under `scripts/` using TRL `SFTTrainer`.
-- [ ] Test: exported records round-trip, and every `completion` names an id
-      that was in that turn's legal set.
+## TASK-12 — Resumable experiment execution
 
-**Done when:** a LoRA-tuned LFM2-350M emits a parseable, legal action id for
-the large majority of prompts in a held-out set.
+**Depends on:** TASK-18, TASK-11, TASK-06.
 
----
+- [ ] Schedule model × opponent × seed × mirror × repeat jobs with stable IDs,
+      isolated logs, bounded concurrency, request/rate limits, and cost caps.
+- [ ] Resume completed jobs without repeating paid requests. Specify whether
+      partial games resume from saved transcripts or restart as distinct attempts.
+      A call interrupted before its response was durably recorded has an unknown
+      outcome; do not promise exactly-once inference or invent its response/cost.
+- [ ] Add bounded transient transport retries/backoff, cancellation, explicit
+      partial statuses, and aggregation without double counting.
+- [ ] Export comparison tables/JSON/CSV with links to evidence and cost coverage.
 
-## TASK-05 — `feat/constrained-decoding`
+**Done when:** interrupted batches retain their evidence and resume predictably.
 
-**Depends on:** TASK-04.
+## TASK-13 — Actual knowledge and decision evaluation
 
-The action space is small integers, so mask the logits and illegal actions become impossible.
+**Depends on:** TASK-09, TASK-10, TASK-11, TASK-18.
+**Guide:** [training tutorial](docs/training.md).
 
-This forces split, the retry-and-fallback added to `StructuredLLMPolicy` is correct for **eval** (it measures format compliance) and wrong for **training** (it silently rewrites the model's action and corrupts on-policy data).
+- [ ] Generate rule-grounded probes: normalization, comparisons, eligibility, ties,
+      action consequences, refusal points, scoring, and near-target decisions.
+- [ ] Separate factual correctness, output compliance, teacher imitation, and
+      strategic quality. The engine knows outcomes, not an optimal action under
+      hidden information merely because it knows the actual deal.
+- [ ] Build strategic scenarios using justified decisions or estimated values under
+      explicit hidden-hand beliefs/opponent policies, with uncertainty and multiple
+      acceptable choices where appropriate.
+- [ ] Hold out deal families and paraphrases; test transfer across seats, scores,
+      equivalent physical cards, unfamiliar partners, and opponent styles.
+- [ ] Compare full-rule, compact-rule, and no-rule probes as distinct tracks for
+      internalized knowledge. Keep full-rule competitive evaluation available.
 
-- [ ] `src/llmoose/agents/decoding.py`: build a per-turn allowed-token set from
-      `observation.legal_action_mask` and the tokenizer, for the digits inside
-      `<answer>…</answer>`.
-- [ ] Local HF/vLLM provider implementing the `LLMProvider` callable, applying
-      the mask.
-- [X] Document and test the two modes explicitly: eval uses
-      `max_retries=2, fallback_on_invalid=True`; rollouts use
-      `max_retries=0, fallback_on_invalid=False`.
-- [X] Keep `PolicyTelemetry.invalid_outputs` reported in both modes — for a
-      350M model this is the primary early metric.
-- [ ] Test: with masking on, a provider that always samples the highest-logit
-      token still returns a legal action.
+**Done when:** improvements in rules, format, and unseen gameplay can be measured
+separately rather than inferred from fluent explanations or a lucky win.
 
-**Done when:** a rollout at `max_retries=0` over 100 hands records zero invalid
-outputs, and the unmasked baseline's invalid rate is recorded for comparison.
+## TASK-14 — Distillation and versioned datasets
 
----
+**Depends on:** TASK-18, TASK-10, TASK-13; reuses TASK-02.
+**Guide:** [training tutorial](docs/training.md).
 
-## TASK-06 — `feat/mirrored-eval`
+- [ ] Collect heuristic, strong-teacher, and later learned-checkpoint decisions
+      with only the acting seat's information. Keep engine factual labels separate.
+- [ ] Export complete system/user messages and assistant targets; observation-only
+      export loses the rules. Filter invalid/fallback labels and balance forced turns.
+- [ ] Split by seed/deal family before collection: all seats, mirrors, and
+      continuations stay together. Deduplicate and balance phases, stakes, positions,
+      hand strengths, and score conditions.
+- [ ] Label student-reached states with teachers to address distribution shift.
+      Preserve teacher identity, prompt/config, cost, and action provenance.
+- [ ] Treat provider reasoning as optional, fallible evidence. Any concise rationale
+      targets need checks against visible facts and the frozen rules.
+- [ ] Explore action-value/preference distillation using sampled hidden worlds
+      consistent with observations and controlled opponents, not hindsight labels
+      derived solely from a lucky actual hand or an omniscient teacher.
 
-**Depends on:** TASK-01.
+**Done when:** datasets reproduce from immutable sources and export manifests,
+with clean splits, traceable teachers, and validated information boundaries.
 
-Mus variance is high enough that an RL win-rate curve without duplicate deals is
-noise. 
-We need something trustworthy to measure against. 
+## TASK-04 — SLM supervised fine-tuning
 
-- [ ] `run_benchmark(..., mirror_seats=True)`: replay every seed with the two
-      partnerships swapped, so both policies see identical deals from both
-      sides.
-- [ ] Attribute wins to the policy pair rather than the seat index —
-      `BenchmarkReport.team_wins` currently means "team 0 / team 1" and stops
-      being meaningful under swapping. Change the report shape deliberately and
-      update its docstring.
-- [ ] Add a bootstrap confidence interval on the win rate and mean score
-      difference.
-- [ ] Per-lance win-rate breakdown — `lance_counts` already exists but is not
-      split by policy.
-- [ ] Named public suites (`SUITE_SMOKE`, `SUITE_STANDARD`) so results are
-      comparable across runs and checkpoints.
-- [ ] Test: mirroring a policy against itself gives a win rate near 0.5 with the
-      CI containing 0.5.
+**Depends on:** TASK-03, TASK-14; evaluates through TASK-06 and TASK-13.
+**Guide:** [training tutorial](docs/training.md).
 
-**Done when:** `llmoose-bench --a heuristic --b conservative --mirror` prints a
-win rate with a CI, on a fixed named suite.
+- [x] Shared action completion contract: `<answer>ID</answer>`.
+- [ ] Implement SFT export/training entry points with configurable checkpoint,
+      tokenizer, LoRA/full tuning, precision, context, batching, seeds, and resume.
+- [ ] Validate dependencies on available hardware; measure memory and throughput
+      before choosing a model size or distributed infrastructure.
+- [ ] Apply the chat template and assistant-target loss mask correctly. Prevent
+      truncation of current cards, rules, and legal choices.
+- [ ] Curriculum: rules/format, diverse demonstrations, then score-aware gameplay.
+      Target-8 smoke games do not substitute for target-40 endgame decisions.
+- [ ] Save/reload weights/adapters, tokenizer, configs, optimizer state, and dataset
+      provenance through the same inference interface used by the benchmark.
+- [ ] Compare base, format-only, heuristic/teacher-distilled, and knowledge-plus-play
+      variants. Select checkpoints on development data, not the final test suite.
 
----
+**Done when:** a reproducible SLM artifact improves over its untuned baseline on
+held-out knowledge and gameplay, with resource use reported.
 
-## TASK-07 — `feat/batched-rollouts`
+## TASK-05 — Constrained action generation
 
-**Depends on:** TASK-05.
+**Depends on:** TASK-10; can run alongside TASK-04.
 
-One decision per generate call wastes almost all of a GPU. 
-Envs are immutable dataclasses and cheap to hold in bulk, so batching is mostly bookkeeping.
+- [ ] Implement a grammar or tokenizer-aware prefix automaton over complete legal
+      answers. A set of permitted digit tokens allows illegal combinations/prefixes.
+- [ ] Add local inference and test tokenizer boundaries, multi-token IDs, and endings.
+- [x] Strict policy mode disables invalid-output retries and conservative fallback;
+      invalid responses and provider failures are separately recorded.
+- [ ] Keep constrained/unconstrained benchmark tracks separate. For on-policy RL,
+      never silently substitute a baseline action; record probabilities under the
+      actual constrained sampling distribution when using constraints.
 
-- [ ] `VectorMusEnv` holding N independent `MusEnv` instances at
-      `episode="hand"`.
-- [ ] Rollout worker: gather the pending decision from every live env, render
-      all prompts, issue one batched `generate`, scatter the actions back.
-- [ ] Handle envs finishing at different times — refill with the next seed
-      rather than blocking on the slowest.
-- [ ] Record throughput (hands/sec, decisions/sec) so regressions are visible.
-- [ ] Test: batched rollout over N envs produces byte-identical episodes to
-      running the same seeds one at a time with a deterministic policy.
+**Done when:** every constrained answer is legal and unassisted format reliability
+remains independently measurable.
 
-**Done when:** N=64 rollouts run with one generate call per decision round and
-match single-env output exactly.
+## TASK-15 — RL environment and learning records
 
----
+**Depends on:** TASK-09, TASK-10, TASK-18.
+**Guide:** [training tutorial](docs/training.md), [artifacts](docs/artifacts.md).
 
-## TASK-08 — `feat/grpo-selfplay`
+- [ ] Add explicit termination/truncation, limits, policy reset hooks, and independent
+      RNG streams for deals, opponents, and model sampling. Bound repeated Mus rounds.
+- [ ] Add a driver for learner/partner/opponent policies supporting one-seat and
+      partnership training, preserving separate private recall.
+- [ ] Specify reward modes: current step rewards are per-team score deltas;
+      hand trajectories use zero-sum differential. Use match outcomes for the
+      competitive objective and evaluate hand rewards/shaping separately.
+- [ ] Support full-match rollouts and validated score-conditioned starts. Hand
+      episodes currently start at zero scores and miss important endgames.
+- [ ] Record sampled tokens, behavior log probabilities, legal/action/token masks,
+      policy revision, turn ownership, rewards, and terminal/truncated flags.
+      Exclude forced actions from policy-gradient decisions.
+- [ ] Isolate any privileged centralized critic inputs from deployed player inputs.
 
-**Depends on:** TASK-02, TASK-06, TASK-07.
+**Done when:** records support a verifiable RL update against interchangeable
+partners/opponents without hidden-information leakage.
 
-Self-play GRPO with a shared policy across all four seats. `run_match` already
-takes a per-seat policy mapping and `MusEnv` already returns the acting seat's
-observation, so shared-policy self-play needs no engine change.
+## TASK-07 — Batched rollouts
 
-- [ ] GRPO training loop over `Episode` batches from TASK-02.
-- [ ] **Role-conditioned advantage baseline, keyed on `mano_offset`.** SPIRAL
-      needed this for first-move advantage in two-player games; Mus is worse —
-      mano acts first *and* wins every tie, postre acts last. Without a
-      per-position baseline the gradient encodes "mano is a good seat" instead
-      of "that was a good bet".
-- [ ] EMA update `b[offset] <- a*b[offset] + (1-a)*R`, advantage
-      `A = R - b[offset]`.
-- [ ] Frozen-checkpoint opponent pool, sampled per rollout, to avoid self-play
-      collapse.
-- [ ] Log the metrics SPIRAL used to catch its failure mode: mean response
-      length, policy gradient norm, invalid-action rate. Their run collapsed
-      from 3,500 chars to near-zero after 200 steps without RAE — watch for the
-      same shape.
-- [ ] Evaluate every K steps against the frozen baselines on the TASK-06
-      mirrored suite; a checkpoint that does not beat `HeuristicPolicy` with a
-      CI excluding 0.5 has not improved.
-- [ ] Ablation to run and record: with and without the mano-conditioned
-      baseline.
+**Depends on:** TASK-05, TASK-15.
 
-**Done when:** a trained checkpoint beats `HeuristicPolicy` on the mirrored
-standard suite with a confidence interval excluding 0.5.
+- [ ] Batch pending decisions by model across independent environments while
+      preserving seat identity, memory, and action routing; refill completed games.
+- [ ] Measure throughput/memory and track policy revision, rollout age, and queues.
+      Begin with frozen behavior policies during synchronous collection.
+- [ ] Verify deterministic scalar/batched equivalence with separate RNG streams.
+      Scale batch size to measured capacity rather than assuming 64 fits.
 
----
+**Done when:** throughput improves without changing transition semantics or
+corrupting behavior probabilities and private observations.
 
-## Backlog
+## TASK-08 — RL training and self-play
 
+**Depends on:** TASK-04, TASK-06, TASK-07, TASK-15.
+**Guide:** [training tutorial](docs/training.md).
 
-- **`feat/anthropic-provider`** — Optional direct provider. Frontier-model
-  comparisons can already use OpenRouter through `ChatCompletionProvider`.
-- **`feat/senas`** — `CommunicationMode.DISABLED` is stubbed.
-- **`feat/elo`** — TrueSkill or Elo across checkpoints, once there are enough
-  checkpoints so it means something.
-- **`perf/event-log`** — `state.events + (event,)` is O(n) per event, so
-  quadratic over a long match. Irrelevant at hand-level episodes; revisit only
-  if full-match rollouts become a bottleneck.
+- [ ] Implement one explicit policy-gradient objective from the SFT parent against
+      frozen opponents, with masks, credit assignment, regularization, and resume.
+- [ ] Choose the algorithm before naming it GRPO. Subtracting a mano-conditioned
+      EMA alone is not GRPO; group-relative training needs comparable rollouts,
+      defined randomness, normalization, and zero-variance handling.
+- [ ] Verify update signs, team/seat rewards, log probabilities, forced-turn
+      exclusion, truncation, and reference/KL terms on controlled tiny trajectories.
+- [ ] Evaluate position-conditioned baselines and reward choices as ablations.
+      Log entropy, action diversity, KL, gradient norms, reward distributions,
+      invalids, output lengths, cost, and gameplay by phase/position.
+- [ ] Evaluate every K updates on frozen development opponents. Require improvement
+      over the SFT parent, not merely a weak heuristic. Use multiple training seeds
+      and final held-out evaluation with uncertainty.
+- [ ] Add frozen checkpoint pools/self-play after the fixed-opponent loop works;
+      compare SFT, fixed-opponent RL, and league training.
+
+**Done when:** RL reproducibly improves held-out gameplay over its SFT parent
+without losing rule understanding or action reliability.
+
+## TASK-16 — Opponent league and human play
+
+**Depends on:** TASK-11, TASK-15; learned players arrive from TASK-08.
+
+- [ ] Maintain immutable scripted/hosted/checkpoint opponent pools and recorded
+      sampling weights; retain diverse styles and freeze opponents within batches.
+- [ ] Evaluate unfamiliar partners and cross-play between checkpoints; report
+      head-to-head matrices and nontransitive results before optional Elo/TrueSkill.
+- [ ] Add terminal `HumanPolicy` with only the assigned seat's view. The all-hands
+      spectator display is unsuitable for a human player in a fair match.
+- [ ] Add a versioned external-agent protocol, timeouts, and invalid-action handling.
+      Network multiplayer is a later layer over the same boundary.
+
+**Done when:** compatible bots, models, and a human can occupy arbitrary seats,
+and training/evaluation reproducibly samples partner/opponent pools.
+
+## TASK-17 — Reproducible release
+
+**Depends on:** TASK-12; include training outputs when available.
+
+- [ ] Publish rules, manifests, baselines, instructions, schemas, failure policy,
+      representative replays, and results with evidence links.
+- [ ] Add dataset/model cards covering splits, teachers, objectives, assistance,
+      compute, licenses/usage constraints, and limitations.
+- [ ] Provide a local smoke path: collect, tiny SFT, reload, benchmark, tiny RL,
+      reload. Keep hardware checks separate from CPU CI.
+- [ ] Release benchmark-only results independently of training experiments.
+
+**Done when:** another user can reproduce a baseline, load a checkpoint, and
+run the documented protocol from preserved artifacts.
+
+## Completed foundations
+
+### TASK-01 — Hand episodes
+
+- [x] Match/hand modes, direct seeded-hand reset, hand-boundary termination,
+      per-hand score deltas, and deterministic-deal tests.
+
+### TASK-02 — Trajectories
+
+- [x] Per-seat turns with prompts, legal/chosen IDs, position, and hand returns;
+      JSONL round trip and partnership-return tests.
+- [x] Current return is undiscounted hand differential stored once per seat episode.
+      A trainer may broadcast it to that seat's turns; that credit-assignment choice
+      still needs validation as a learning objective.
+
+### TASK-03 — Training dependencies
+
+- [x] Optional training dependencies declared; obsolete transformer policy removed.
+      Hardware/runtime validation is tracked in TASK-04.
+
+## Later backlog
+
+- Direct provider integrations when the compatible transport is insufficient.
+- Gymnasium/PettingZoo adapters once the internal RL contract is stable.
+- Distributed/cloud workers after local training and batching are measured.
+- Señas or alternate Mus variants as separately versioned environments.
+- Event-log storage optimization if profiling establishes a bottleneck.

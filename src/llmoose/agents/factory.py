@@ -6,6 +6,7 @@ from typing import Mapping
 
 from llmoose.agents.baselines import ConservativePolicy, HeuristicPolicy, RandomPolicy
 from llmoose.agents.llm import DecisionLogger, LLMProvider, StructuredLLMPolicy
+from llmoose.agents.prompt import PROMPT_VERSION
 from llmoose.agents.protocol import Policy
 from llmoose.game.actions import ActionCodec
 from llmoose.game.state import SEATS, Seat
@@ -21,6 +22,7 @@ def build_policies(
     provider: LLMProvider | None = None,
     strict: bool = False,
     on_record: DecisionLogger | None = None,
+    prompt_version: int = PROMPT_VERSION,
 ) -> dict[Seat, Policy]:
     """Create one independent policy per seat.
 
@@ -43,6 +45,7 @@ def build_policies(
                 max_retries=0 if strict else 2,
                 fallback_on_invalid=not strict,
                 on_record=on_record,
+                prompt_version=prompt_version,
             )
         elif name == "random":
             policies[seat] = RandomPolicy(codec, seed + int(seat))

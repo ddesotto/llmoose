@@ -6,22 +6,30 @@ import argparse
 import math
 import os
 import sys
+from contextlib import nullcontext
+from dataclasses import asdict
 from pathlib import Path
 from typing import Optional, Sequence
+from uuid import uuid4
+
+from dotenv import load_dotenv
 
 from llmoose.agents.factory import POLICY_NAMES, build_policies
+from llmoose.agents.prompt import PROMPT_VERSION, PROMPT_VERSIONS
 from llmoose.agents.providers import OPENROUTER_BASE_URL, ChatCompletionProvider
 from llmoose.game.actions import ActionCodec
-from llmoose.game.state import SEATS, team_for
+from llmoose.game.state import SEATS, new_game, team_for
 from llmoose.rules.ruleset import Ruleset
 from llmoose.simulation.match import run_match
 from llmoose.simulation.reporting import DecisionReporter, llm_summary, match_summary
+from llmoose.simulation.runs import RunRecorder
 from llmoose.simulation.terminal import TerminalSpectator
 from llmoose.simulation.traces import save_trace, trace_from_match
 
 
 def play_command(argv: Optional[Sequence[str]] = None) -> int:
     """Wire the experiment together; policies choose moves and the engine runs Mus."""
+    load_dotenv(Path.cwd() / ".env", override=False)
     parser = _build_parser()
     args = parser.parse_args(argv)
     teams = (args.team_0 or args.policy, args.team_1 or args.policy)
@@ -32,17 +40,33 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
         parser.error(str(exc))
 
     ruleset = Ruleset(target_score=args.target_score)
-    reporter = DecisionReporter(
-        args.llm_log,
-        {
-            "seed": args.seed,
-            "target_score": args.target_score,
-            "requested_model": args.model,
-            "temperature": args.temperature,
-            "max_tokens": args.max_tokens,
-            "strict": args.llm_strict,
-        },
-    )
+    directory = Path(args.run_dir) if args.run_dir else None
+    if directory is not None:
+        try:
+            directory.mkdir(parents=True, exist_ok=False)
+        except OSError as exc:
+            parser.error(f"Cannot create a new run directory: {exc}")
+        args.trace = str(directory / "match.json")
+        if provider is not None:
+            args.llm_log = str(directory / "decisions.jsonl")
+    metadata = {
+        "seed": args.seed,
+        "target_score": args.target_score,
+        "ruleset": asdict(ruleset),
+        "teams": list(teams),
+        "requested_model": args.model,
+        "base_url": args.base_url if provider is not None else None,
+        "prompt_version": args.prompt_version,
+        "temperature": args.temperature,
+        "max_tokens": args.max_tokens,
+        "timeout": args.timeout,
+        "max_steps": args.max_steps,
+        "strict": args.llm_strict,
+        "include_reasoning": args.reasoning,
+    }
+    if directory is not None:
+        metadata["run_id"] = uuid4().hex
+    reporter = DecisionReporter(args.llm_log, metadata)
     policies = build_policies(
         {seat: teams[team_for(seat)] for seat in SEATS},
         ActionCodec(ruleset.target_score),
@@ -50,18 +74,56 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
         provider=provider,
         strict=args.llm_strict,
         on_record=reporter,
+        prompt_version=args.prompt_version,
     )
     spectator = _build_spectator(args, teams, provider is not None)
+    recorder = (
+        RunRecorder(directory, new_game(args.seed, ruleset), metadata, reporter)
+        if directory is not None
+        else None
+    )
+    action_count = 0
+
+    def before_action(state):
+        reporter.action_index = action_count
+        if spectator is not None:
+            spectator.before_action(state)
+
+    def after_action(before, action, after):
+        nonlocal action_count
+        action_count += 1
+        if recorder is not None:
+            recorder.on_transition(before, action, after)
+        if spectator is not None:
+            spectator(before, action, after)
+
     try:
-        with reporter:
+        with reporter, recorder if recorder is not None else nullcontext():
             result = run_match(
                 policies,
                 args.seed,
                 ruleset,
                 args.max_steps,
-                on_transition=spectator,
-                on_turn=spectator.before_action if spectator else None,
+                on_transition=after_action,
+                on_turn=before_action,
             )
+            if args.trace:
+                trace_metadata = {
+                    "policy": args.policy,
+                    "team_0": teams[0],
+                    "team_1": teams[1],
+                }
+                if provider is not None:
+                    trace_metadata.update(
+                        model=args.model,
+                        llm_strict=str(args.llm_strict),
+                        prompt_version=str(args.prompt_version),
+                    )
+                if directory is not None:
+                    trace_metadata["run_id"] = metadata["run_id"]
+                trace_path = Path(args.trace)
+                trace_path.parent.mkdir(parents=True, exist_ok=True)
+                save_trace(trace_from_match(result, trace_metadata), trace_path)
     except KeyboardInterrupt:
         print("\nStopped before match completion.")
         return 130
@@ -71,13 +133,10 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
         summary = llm_summary(policies.values())
         if summary is not None:
             print(summary, file=sys.stderr, flush=True)
+        if directory is not None and (directory / "report.json").exists():
+            print(f"Run report: {directory / 'report.json'}", file=sys.stderr)
 
     print(match_summary(result))
-    if args.trace:
-        metadata = {"policy": args.policy, "team_0": teams[0], "team_1": teams[1]}
-        if provider is not None:
-            metadata.update(model=args.model, llm_strict=str(args.llm_strict))
-        save_trace(trace_from_match(result, metadata), args.trace)
     return 0
 
 
@@ -114,11 +173,22 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--trace", type=str, help="Write a replayable JSON trace to this path"
     )
+    parser.add_argument(
+        "--run-dir",
+        help="Create a new directory with moves, LLM logs, replay, and scores",
+    )
     llm_options = parser.add_argument_group("LLM player (OpenRouter by default)")
     llm_options.add_argument(
         "--model",
         default=os.environ.get("OPENROUTER_MODEL"),
         help="Model ID (or OPENROUTER_MODEL)",
+    )
+    llm_options.add_argument(
+        "--prompt-version",
+        type=int,
+        choices=PROMPT_VERSIONS,
+        default=PROMPT_VERSION,
+        help=f"Shared system prompt version (default: {PROMPT_VERSION})",
     )
     llm_options.add_argument(
         "--base-url", default=OPENROUTER_BASE_URL, help="OpenAI-compatible API base URL"
@@ -142,10 +212,17 @@ def _build_parser() -> argparse.ArgumentParser:
     llm_options.add_argument(
         "--llm-log", help="Write prompts, responses, usage, and action choices to JSONL"
     )
+    llm_options.add_argument(
+        "--reasoning",
+        action="store_true",
+        help="Request provider reasoning for inspection (if supported)",
+    )
     return parser
 
 
 def _validate_options(args: argparse.Namespace, teams: tuple[str, str]) -> None:
+    if args.run_dir and (args.trace or args.llm_log):
+        raise ValueError("--run-dir supplies --trace and --llm-log; use it on its own")
     if args.target_score < 2:
         raise ValueError("--target-score must be at least 2")
     if args.max_steps < 1:
@@ -157,8 +234,10 @@ def _validate_options(args: argparse.Namespace, teams: tuple[str, str]) -> None:
             raise ValueError(
                 "--model or OPENROUTER_MODEL is required for an LLM player"
             )
-    elif args.llm_log or args.llm_strict:
-        raise ValueError("--llm-log and --llm-strict require an llm policy")
+    elif args.llm_log or args.llm_strict or args.reasoning:
+        raise ValueError(
+            "--llm-log, --llm-strict, and --reasoning require an llm policy"
+        )
     if (
         args.llm_log
         and args.trace
@@ -182,6 +261,7 @@ def _build_provider(args: argparse.Namespace) -> ChatCompletionProvider:
         timeout=args.timeout,
         max_tokens=args.max_tokens,
         temperature=args.temperature,
+        include_reasoning=args.reasoning,
     )
 
 

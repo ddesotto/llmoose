@@ -2,6 +2,21 @@
 
 `llmoose` is a research environment for training and benchmarking SLLMs on the Spanish card game Mus.
 
+Start the [learning guide](docs/README.md) for the path from playing a game to
+building MooseBench, preserving traces, distilling an SLM, and training through
+play. The [roadmap](TODO.md) separates implemented foundations from planned work.
+
+Open [the interactive HTML workspace](docs/index.html) in a browser for task
+checklists, personal notes, the full learning library, evidence, and a trace
+explorer. It works offline. Progress is browser-local and can be exported/imported;
+it does not edit `TODO.md`. Rebuild after source changes with
+`.venv/bin/python scripts/build_dashboard.py`.
+
+The [game and prompt audit](docs/game-and-prompt.md) documents a confirmed hand
+ranking defect and unresolved differences from reference Mus rules. The current
+environment is suitable for development experiments; these findings need resolution
+before treating its outcomes as validated benchmark scores or training labels.
+
 
 # Code
 
@@ -68,18 +83,19 @@ src/llmoose/
 
 # Play
 
-Install the local package (Python 3.11+):
+Use `uv` and the committed lockfile (Python 3.11+):
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -e '.[dev]'
+uv sync --frozen --extra dev
+uv run --frozen --extra dev pytest -q
 ```
+
+`uv` creates and uses the project’s `.venv`; activation is optional.
 
 Watch the heuristic partnership play against the conservative partnership:
 
 ```bash
-llmoose-play --seed 12 --target-score 8 --team-0 heuristic --team-1 conservative --watch
+uv run --frozen llmoose-play --seed 12 --target-score 8 --team-0 heuristic --team-1 conservative --watch
 ```
 
 The spectator view shows all four hands, mano, each decision, and scoring as it
@@ -91,8 +107,8 @@ Use `--step` to advance one action at a time with Enter (`q` quits), or
 immediately. Both options enable the spectator view.
 
 ```bash
-llmoose-play --seed 12 --target-score 8 --policy heuristic --step
-llmoose-play --seed 12 --target-score 8 --policy random --watch --delay 0.1 --trace match.json
+uv run --frozen llmoose-play --seed 12 --target-score 8 --policy heuristic --step
+uv run --frozen llmoose-play --seed 12 --target-score 8 --policy random --watch --delay 0.1 --trace match.json
 ```
 
 Available policies are `conservative`, `heuristic`, `random`, and `llm`. `--policy`
@@ -102,26 +118,25 @@ Without spectator options, the command prints only the final result. `--trace`
 saves a completed match for deterministic replay. Stopping early does not save
 a partial trace.
 
-You can also run directly from the checkout without installing:
-
-```bash
-PYTHONPATH=src python -m llmoose.cli --seed 12 --target-score 8 --policy heuristic --watch
-```
-
 ## OpenRouter player
 
-Set your key and a model ID from [OpenRouter's catalog](https://openrouter.ai/models).
-Replace both placeholder values below. The client uses OpenRouter's
-[OpenAI-compatible chat completions format](https://openrouter.ai/docs/quickstart)
-and needs no additional Python dependencies.
+Put your key and a model ID from [OpenRouter's catalog](https://openrouter.ai/models)
+in `.env` in the directory where you run the command:
+
+```dotenv
+OPENROUTER_API_KEY=your-key
+OPENROUTER_MODEL=provider/model-id
+```
+
+The CLI loads `.env` automatically. Existing shell variables take precedence;
+`--model` takes precedence over both. `.env` is gitignored. Exporting the variables
+in your shell also works. The client uses OpenRouter's
+[OpenAI-compatible chat completions format](https://openrouter.ai/docs/quickstart).
 
 ```bash
-export OPENROUTER_API_KEY='your-key'
-export OPENROUTER_MODEL='provider/model-id'
-
-llmoose-play --seed 12 --target-score 8 \
+uv run --frozen llmoose-play --seed 12 --target-score 8 \
   --team-0 llm --team-1 heuristic --watch \
-  --llm-log runs/decisions.jsonl --trace runs/match.json
+  --run-dir runs/llm-seed-12
 ```
 
 `--model` overrides `OPENROUTER_MODEL`. Both seats in an LLM partnership use
@@ -144,6 +159,115 @@ Records are saved as the match runs; each invocation overwrites the file.
 [the policy](src/llmoose/agents/llm.py) and
 [reporting](src/llmoose/simulation/reporting.py) for log details.
 
+## Trace and score a run
+
+`--run-dir runs/llm-seed-12` creates a **new** directory with:
+
+| File | Contents |
+| --- | --- |
+| `decisions.jsonl` | Exact LLM prompts/responses, prompt version, request timing, usage, retries, and fallbacks; only created for LLM games |
+| `moves.jsonl` | Every applied move, public events, and before/after scores, flushed during play |
+| `match.json` | Deterministic replay of a completed match |
+| `report.json` | Run settings, completion status, automatic game scores, and LLM metrics |
+
+Existing run directories are rejected to protect earlier experiments. Use a new
+name for each run. `--run-dir` supplies the log and trace paths; do not combine it
+with `--llm-log` or `--trace`.
+
+The report scores each partnership with **1 for a win, 0 for a loss**, plus its
+stones, stone differential, and per-lance wins and points. Lance results include
+folds and uncontested awards, with reasons broken out. These describe the game's
+outcome; they are not strategic decision grades or a benchmark win rate.
+
+LLM metrics are reported overall, by team, and by seat. First-try legal rate and
+fallback rate use decisions requiring inference as the denominator; forced
+moves are excluded. Invalid-response rate counts returned responses, excluding
+connection failures. Token and provider-reported cost totals include retries;
+each total includes the number of requests that reported it. Missing usage is
+`null`, not zero. Cost is recorded as supplied by the provider.
+
+`run_id` identifies the experiment. A zero-based `action_index` links all attempts
+for a decision to `moves.jsonl` and the action list in `match.json`.
+`decision_index` is local to each seat. The exact prompts remain in the decision
+log, alongside the requested and returned model IDs.
+
+If interrupted, limited by `--max-steps`, or stopped by a provider/format error,
+the run retains its logs and a partial report. An incomplete game has no winner
+or win points. `match.json` is written only after the game completes. A hard
+process kill may leave only the already-flushed JSONL logs.
+
+For an offline smoke run:
+
+```bash
+uv run --frozen llmoose-play --seed 12 --target-score 8 \
+  --team-0 heuristic --team-1 conservative --run-dir runs/baseline-seed-12
+```
+
+## Inspect and replay games
+
+```bash
+# Results, reliability, tokens (including reasoning), and reported cost.
+uv run --frozen llmoose-inspect runs/llm-first
+
+# Find an interesting zero-based action index, then read its exact conversation.
+uv run --frozen llmoose-inspect runs/llm-first --decisions
+uv run --frozen llmoose-inspect runs/llm-first --action 14
+
+# Watch the saved game again, with all four hands visible and no API calls.
+uv run --frozen llmoose-inspect runs/llm-first --replay --step
+```
+
+Inspection also works during a run: it reads the flushed JSONL records and shows
+the latest saved score until the final report exists. Action inspection includes
+all retries and any provider-returned reasoning text or summary. Old logs without
+reasoning text cannot reconstruct it from token counts.
+
+To request reasoning on a longer game:
+
+```bash
+uv run --frozen llmoose-play --seed 12 --target-score 40 \
+  --team-0 llm --team-1 heuristic --reasoning --max-tokens 2048 \
+  --run-dir runs/llm-long
+```
+
+`--reasoning` sends OpenRouter's `reasoning: {enabled: true, exclude: false}`.
+The client preserves returned `reasoning` and `reasoning_details` separately from
+the final action. Availability depends on the model/provider; a reasoning-token
+count does not guarantee readable text. Reasoning tokens are part of the output
+budget, so increase `--max-tokens` if answers are truncated. See
+[OpenRouter's reasoning documentation](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
+
+For background play from your terminal, use a fresh run name:
+
+```bash
+mkdir -p runs
+nohup uv run --frozen llmoose-play --seed 12 --target-score 40 \
+  --team-0 llm --team-1 heuristic --reasoning --max-tokens 2048 \
+  --run-dir runs/llm-background > runs/llm-background.console.log 2>&1 < /dev/null &
+
+uv run --frozen llmoose-inspect runs/llm-background
+```
+
+The target is a score threshold, not a fixed number of hands; an órdago can end
+even a 40-point match early. Use multiple seeded games for performance comparisons.
+
+## Shared system prompts
+
+Game instructions live in
+[`src/llmoose/agents/system_prompts/`](src/llmoose/agents/system_prompts/).
+`v1.txt` preserves the original instructions; **`v2.txt` is the condensed default**.
+Every model uses the same selected instructions, followed by its seat/team role.
+Private cards, public history, and legal choices stay in the user message.
+
+Use `--prompt-version 1` or `--prompt-version 2` to select a version. Logs and
+reports record it, and training renderers accept the same `prompt_version`.
+Keep published versions unchanged: add a new `vN.txt` and register it in
+`agents/prompt.py` when changing instructions. Both files ship with the package.
+
+The current default is a compact reminder, not yet a complete explanation of the
+player interface. See the [prompt review](docs/game-and-prompt.md) for missing
+action consequences, score timing, private recall, and the planned next version.
+
 Request settings are `--max-tokens` (1024), `--temperature` (0), and `--timeout`
 (60 seconds). If reasoning uses up the token budget before an answer, increase
 `--max-tokens`.
@@ -151,7 +275,7 @@ Request settings are `--max-tokens` (1024), `--temperature` (0), and `--timeout`
 To use a local or hosted OpenAI-compatible server:
 
 ```bash
-llmoose-play --team-0 llm --team-1 heuristic --watch \
+uv run --frozen llmoose-play --team-0 llm --team-1 heuristic --watch \
   --base-url http://localhost:8000/v1 --model your-served-model
 ```
 

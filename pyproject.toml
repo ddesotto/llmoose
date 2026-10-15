@@ -10,7 +10,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "ddesotto" }]
-dependencies = []
+dependencies = [
+    "python-dotenv>=1.2",
+]
 
 [project.optional-dependencies]
 train = [
@@ -26,9 +28,13 @@ dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
 llmoose-play = "llmoose.cli:play_command"
+llmoose-inspect = "llmoose.simulation.inspect:inspect_command"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"llmoose.agents" = ["system_prompts/*.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

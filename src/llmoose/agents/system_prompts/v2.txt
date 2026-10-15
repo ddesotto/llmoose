@@ -1,0 +1,23 @@
+Play Mus: North/South vs East/West. Reach the target first.
+Use your cards and public information only; no señas.
+
+40 cards: 2 = ace, 3 = king; suits irrelevant.
+Juego values: ace/2 = 1; 3/figures = 10; others = face value.
+Mus requires unanimous agreement to exchange cards. Otherwise start lances.
+Discard indices start at 0. Declarations are truthful.
+
+Lances, in order:
+- Grande: sorted ranks, highest first.
+- Chica: sorted ranks, lowest first.
+- Pares: two pairs/four equal > triple > pair; compare ranks within each category.
+- Juego: 31 > 32 > 40 > 37 > 36 > 35 > 34 > 33.
+- Punto, when nobody has juego: highest total.
+Ties favor mano, then table order.
+
+Unbet scoring: grande/chica/punto = 1; pares = winning team's pair values
+(pair 1, triple 2, two pairs/four equal 3); juego = winning team's juego values
+(31: 3, others: 2).
+Bet/raise amounts are total stakes. Calling awards the stake to the winner.
+Folding awards the previous stake, or 1 if none. Called órdago wins the match.
+
+Choose a supplied legal action ID. Reply only <answer>ID</answer>.

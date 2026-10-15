@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from time import perf_counter
 from typing import Callable, Mapping, Sequence
 
 from llmoose.agents.baselines import ConservativePolicy
-from llmoose.agents.prompt import PROMPT_VERSION, render_messages
+from llmoose.agents.prompt import PROMPT_VERSION, load_system_prompt, render_messages
 from llmoose.agents.providers import Completion, ProviderError
 from llmoose.game.actions import Action, ActionCodec
 from llmoose.observations.core import Observation
@@ -47,9 +48,11 @@ class StructuredLLMPolicy:
     max_retries: int = 2
     fallback_on_invalid: bool = True
     on_record: DecisionLogger | None = None
+    prompt_version: int = PROMPT_VERSION
     telemetry: PolicyTelemetry = field(default_factory=PolicyTelemetry, init=False)
 
     def __post_init__(self) -> None:
+        load_system_prompt(self.prompt_version)
         if self.max_retries < 0:
             raise ValueError("max_retries must be non-negative")
 
@@ -62,10 +65,11 @@ class StructuredLLMPolicy:
         if not legal_ids:
             raise ValueError("LLM policy was asked to act without legal actions")
         self.telemetry.decisions += 1
-        messages = render_messages(observation)
+        messages = render_messages(observation, prompt_version=self.prompt_version)
         context = {
             "schema_version": 1,
-            "prompt_version": PROMPT_VERSION,
+            "decision_index": self.telemetry.decisions - 1,
+            "prompt_version": self.prompt_version,
             "seat": int(observation.seat),
             "hand_number": observation.hand_number,
             "phase": observation.phase.value,
@@ -85,14 +89,30 @@ class StructuredLLMPolicy:
             return self.codec.decode(legal_ids[0])
         for attempt in range(self.max_retries + 1):
             self.telemetry.requests += 1
+            started = perf_counter()
             try:
                 completion = self.provider(messages)
+            except KeyboardInterrupt:
+                record(
+                    status="interrupted",
+                    attempt=attempt + 1,
+                    latency_seconds=perf_counter() - started,
+                )
+                raise
             except ProviderError as exc:
                 self.telemetry.provider_errors += 1
-                record(status="provider_error", error=str(exc), attempt=attempt + 1)
+                record(
+                    status="provider_error",
+                    error=str(exc),
+                    attempt=attempt + 1,
+                    latency_seconds=perf_counter() - started,
+                )
                 raise
             details = {
+                "latency_seconds": perf_counter() - started,
                 "response": completion.text,
+                "reasoning": completion.reasoning,
+                "reasoning_details": list(completion.reasoning_details),
                 "model": completion.model,
                 "finish_reason": completion.finish_reason,
                 "usage": dict(completion.usage),

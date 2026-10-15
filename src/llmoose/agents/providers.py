@@ -23,6 +23,8 @@ class Completion:
     model: str = ""
     finish_reason: str | None = None
     usage: Mapping[str, object] = field(default_factory=dict)
+    reasoning: str | None = None
+    reasoning_details: tuple[Mapping[str, object], ...] = ()
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -38,6 +40,7 @@ class ChatCompletionProvider:
     timeout: float = 60.0
     max_tokens: int = 1024
     temperature: float = 0.0
+    include_reasoning: bool = False
 
     def __post_init__(self) -> None:
         url = urlsplit(self.base_url)
@@ -62,17 +65,18 @@ class ChatCompletionProvider:
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        body = {
+            "model": self.model,
+            "messages": list(messages),
+            "stream": False,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+        }
+        if self.include_reasoning:
+            body["reasoning"] = {"enabled": True, "exclude": False}
         request = Request(
             self.base_url.rstrip("/") + "/chat/completions",
-            data=json.dumps(
-                {
-                    "model": self.model,
-                    "messages": list(messages),
-                    "stream": False,
-                    "max_tokens": self.max_tokens,
-                    "temperature": self.temperature,
-                }
-            ).encode("utf-8"),
+            data=json.dumps(body).encode("utf-8"),
             headers=headers,
             method="POST",
         )
@@ -114,11 +118,21 @@ class ChatCompletionProvider:
             usage = payload.get("usage") or {}
             if not isinstance(usage, dict):
                 raise TypeError
+            reasoning = choice["message"].get("reasoning")
+            details = choice["message"].get("reasoning_details") or []
+            if reasoning is not None and not isinstance(reasoning, str):
+                raise TypeError
+            if not isinstance(details, list) or any(
+                not isinstance(d, dict) for d in details
+            ):
+                raise TypeError
             return Completion(
                 content,
                 payload.get("model", self.model),
                 choice.get("finish_reason"),
                 usage,
+                reasoning,
+                tuple(details),
             )
         except (KeyError, IndexError, TypeError, AttributeError):
             raise ProviderError(

@@ -2,28 +2,31 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+from importlib.resources import files
+
 from llmoose.game.actions import Action, ActionCodec, ActionKind
 from llmoose.game.state import Seat
 from llmoose.observations.core import Observation
 
-PROMPT_VERSION = 1
-SYSTEM_PROMPT = """You play one seat in llmoose, a four-player Mus sandbox.
-North/South are team 0; East/West are team 1. Maximize your partnership's score.
-You see only your own cards and public information. No señas are allowed.
-The deck has 40 cards. Twos count as aces and threes as kings. Figures and threes
-count as 10 for juego; twos count as 1. Suits do not break ties.
-Grande compares ranks from highest down; chica from lowest up.
-Pares: duples (two pairs or four equal) beats medias (three equal), then one pair.
-Juego totals rank 31, 32, 40, 37, 36, 35, 34, 33, best first.
-Punto is played only when nobody has juego; the highest total wins.
-Mano wins ties, followed by the other seats in table order.
-Mus requires everyone to agree; cutting Mus starts the lances. Discard indices
-refer to your current hand, starting at zero. Declarations are enforced truthfully.
-Bet and raise amounts are absolute stakes, not increments. The next eligible
-opponent answers a bid. A called órdago wins the match; folding awards the
-previous stake (one stone if there was no previous bet).
-Choose exactly one of the supplied legal action IDs.
-Return only <answer>ID</answer>, with no explanation or additional text."""
+PROMPT_VERSION = 2
+PROMPT_VERSIONS = (1, 2)
+
+
+@lru_cache(maxsize=None)
+def load_system_prompt(version: int = PROMPT_VERSION) -> str:
+    """Load shared, immutable game instructions from a packaged version."""
+    if version not in PROMPT_VERSIONS:
+        raise ValueError(f"Unknown prompt version: {version}")
+    return (
+        files("llmoose.agents")
+        .joinpath("system_prompts", f"v{version}.txt")
+        .read_text(encoding="utf-8")
+        .strip()
+    )
+
+
+SYSTEM_PROMPT = load_system_prompt()
 
 
 def describe_action(action: Action) -> str:
@@ -70,18 +73,22 @@ def render_observation(observation: Observation) -> str:
     return "\n".join(lines)
 
 
-def render_messages(observation: Observation) -> list[dict[str, str]]:
+def render_messages(
+    observation: Observation, *, prompt_version: int = PROMPT_VERSION
+) -> list[dict[str, str]]:
     offset = (observation.seat - observation.mano) % 4
     role = f"You are {observation.seat.name}, team {observation.team}, mano_offset {offset}."
     return [
-        {"role": "system", "content": f"{SYSTEM_PROMPT}\n{role}"},
+        {"role": "system", "content": f"{load_system_prompt(prompt_version)}\n{role}"},
         {"role": "user", "content": render_observation(observation)},
     ]
 
 
-def render_prompt(observation: Observation) -> str:
+def render_prompt(
+    observation: Observation, *, prompt_version: int = PROMPT_VERSION
+) -> str:
     """Full readable prompt for collect_episode(..., render=render_prompt)."""
     return "\n\n".join(
         f"[{message['role']}]\n{message['content']}"
-        for message in render_messages(observation)
+        for message in render_messages(observation, prompt_version=prompt_version)
     )

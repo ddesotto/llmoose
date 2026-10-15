@@ -1,12 +1,14 @@
 docs/
+artifacts/
+
+runs/
 
 .venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 *.egg-info/
-runs/
+
 .env
 .env.*
 !.env.example
-artifacts/
