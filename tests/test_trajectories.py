@@ -8,6 +8,7 @@ from llmoose.game.actions import ActionCodec
 from llmoose.game.state import SEATS, Seat, team_for
 from llmoose.rules.ruleset import Ruleset
 from llmoose.training import collect_episode, read_episodes, write_episodes
+from llmoose.training.trajectories import episode_from_dict, episode_to_dict
 
 RULESET = Ruleset(target_score=8)
 CODEC = ActionCodec(RULESET.target_score)
@@ -60,6 +61,19 @@ def test_every_seat_gets_an_episode_of_the_same_hand() -> None:
         (SCORING_HAND["seed"], SCORING_HAND["hand_number"])
     }
     assert all(episode.target_score == RULESET.target_score for episode in episodes)
+    assert all(episode.ruleset_id == RULESET.id for episode in episodes)
+
+
+def test_old_episodes_remain_readable_without_inventing_rules_provenance():
+    value = episode_to_dict(_collect()[0])
+    assert value["schema_version"] == 2
+    assert value["ruleset_id"] == RULESET.id
+    value["schema_version"] = 1
+    del value["ruleset_id"]
+    old = episode_from_dict(value)
+    assert old.ruleset_id is None
+    assert old.team_return == value["team_return"]
+    assert episode_from_dict(episode_to_dict(old)) == old
 
 
 def test_turn_counts_per_seat_sum_to_the_hands_action_count() -> None:

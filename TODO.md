@@ -27,8 +27,10 @@ browser-local progress and notes. Its checkmarks do not modify this source.
       evidence inspection, a synthetic trace explorer, and progress export/import.
       Regenerate with `.venv/bin/python scripts/build_dashboard.py` after source edits.
 
-The existing 117 tests pass, but the audit reproduces an uncovered medias ranking
-bug. Saved runs verify the workflow, not a model ranking: both use seed 12; the
+The medias ranking bug found in the audit was fixed in `1c5baf2`. The default v2
+ruleset now implements federation-based deferred scoring and distinct órdago
+handling; v1 retains the former scoring for replay. The [rules contract](README.md#rules-contract)
+names the remaining benchmark adaptations. Saved runs verify the workflow, not a model ranking: both use seed 12; the
 short game won mostly through uncontested juego, while the longer game lost with
 all 57 inference decisions syntactically valid. Rule correctness, clear instructions,
 and durable artifacts must precede expensive data generation.
@@ -55,23 +57,25 @@ Use development suites during iteration and reserve test suites for final compar
 **Priority:** blocking trusted benchmark outcomes and training labels.
 **Guide:** [game and prompt audit](docs/game-and-prompt.md).
 
-- [ ] Fix `_evaluate_pares`: choose the rank occurring three times, not the highest
-      card. Cover a higher singleton, normalized ranks, and equal triples with
-      different singletons. Current reproducer: `4,4,4,K` incorrectly beats `7,7,7,A`.
-- [ ] Choose and document the intended Mus variant. The current engine resolves
-      every lance immediately; authoritative Mus references defer accepted bets
-      and distinguish them from an accepted órdago. Do not hide this behind a
-      generic “Mus” label or silently change old replay semantics.
-- [ ] Decide scoring for called/folded pares and juego, showdown timing, public
+- [x] Fix `_evaluate_pares`: choose the rank occurring three times, not the highest
+      card. Higher-singleton and normalized-rank regressions are covered in
+      `1c5baf2`; `4,4,4,K` now correctly loses to `7,7,7,A`.
+- [x] Choose and document the intended Mus variant: federation-based v2 with
+      end-of-hand settlement, separate órdago, and a retained legacy v1 path.
+- [x] Decide scoring for called/folded pares and juego, showdown timing, public
       card reveals, minimum raises, discards/recycling, and partnership responses.
       Document explicit deviations from the selected reference rules.
-- [ ] Resolve the engine's equivalence of a numeric bet at the target and órdago.
+- [x] Resolve the engine's equivalence of a numeric bet at the target and órdago.
       Preserve a distinct action/event flag if semantics differ.
 - [ ] Add independent expected-result fixtures for each comparison, eligibility,
       tie, betting chain, uncontested award, score threshold, and órdago outcome.
+      Scoring/órdago fixtures now cover every lance in `test_federation_scoring.py`;
+      finish the comparison/eligibility matrix, including equal triples with
+      different singletons.
       Deterministic replay of the same engine is not an independent rules oracle.
-- [ ] Version changed semantics, reconcile misleading code docstrings, and retain
-      provenance for historical datasets/runs.
+- [x] Version scoring semantics and reconcile affected docstrings. Preserve old
+      trace IDs/files and reject unsupported rulesets. The legacy fixture records
+      its source commit; pre-medias-fix traces still need their original evaluator.
 
 **Done when:** a frozen rules specification and independent fixtures agree with
 all scoring and transition paths, with known deviations explicitly named.
@@ -81,13 +85,13 @@ all scoring and transition paths, with known deviations explicitly named.
 **Depends on:** TASK-09 for final semantics.
 **Guide:** [game and prompt audit](docs/game-and-prompt.md).
 
-- [ ] Add a new prompt version without rewriting v1/v2. Explain four-card hands,
+- [x] Add prompt v3 without rewriting v1/v2. Explain four-card hands,
       physical deck composition, normalized rank order, juego threshold, mano,
       explicit table order, the hand lifecycle, and the partnership win condition.
 - [ ] Define every action and its consequences. Explain pass versus fold, binding
       team responses, the best eligible individual hand, declarations, and
       uncontested lances. State whether intrinsic values add to bets.
-- [ ] Explain score timing and that displayed totals already include resolved
+- [x] Explain score timing and that displayed totals already include resolved
       awards. Include worked comparisons and a bet–raise–fold example.
 - [ ] Render player-facing context instead of unexplained enum labels: active
       lance, eligible seats, tie order, bidding team, and recipient of refusal points.
@@ -184,7 +188,7 @@ inference budget, and scoring protocol.
       together. Report win rates and paired candidate differences with uncertainty.
 - [ ] Report primary win/loss plus stone differential, per-lance outcomes,
       contested/uncontested awards, legality, fallbacks, failures, usage, and latency.
-      Explain large score overshoots after accepted órdagos.
+      Distinguish legacy órdago overshoots from v2's terminal score encoding.
 - [ ] Provide named suites, machine-readable reports, and a `llmoose-bench` CLI.
       Predeclare sample sizes or precision goals; smoke runs are not leaderboard evidence.
 - [ ] Test attribution, pairing, and aggregation. Identical deterministic policies

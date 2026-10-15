@@ -12,7 +12,7 @@ from llmoose.game.environment import EnvEpisode, MusEnv
 from llmoose.game.state import SEATS, Phase, Seat, team_for
 from llmoose.observations.core import Observation
 
-EPISODE_SCHEMA_VERSION = 1
+EPISODE_SCHEMA_VERSION = 2
 
 PromptRenderer = Callable[[Observation], str]
 
@@ -33,7 +33,7 @@ class TurnRecord:
 class Episode:
     """One seat's turns in a hand, with the hand's team differential as the return.
 
-    ``team_return`` is the undiscounted return for a team in ``turns``. 
+    ``team_return`` is the undiscounted return for a team in ``turns``.
     !! Not normalized, leave that to trainign loop
     """
 
@@ -45,6 +45,7 @@ class Episode:
     team: int
     mano_offset: int
     target_score: int
+    ruleset_id: Optional[str] = None
 
 
 def collect_episode(
@@ -106,6 +107,7 @@ def collect_episode(
             team=team_for(seat),
             mano_offset=_mano_offset(seat, mano),
             target_score=env.ruleset.target_score,
+            ruleset_id=env.ruleset.id,
         )
         for seat in SEATS
     )
@@ -150,6 +152,7 @@ def episode_to_dict(episode: Episode) -> dict[str, Any]:
         "team": episode.team,
         "mano_offset": episode.mano_offset,
         "target_score": episode.target_score,
+        "ruleset_id": episode.ruleset_id,
         "team_return": episode.team_return,
         "turns": [_turn_to_dict(turn) for turn in episode.turns],
     }
@@ -157,7 +160,7 @@ def episode_to_dict(episode: Episode) -> dict[str, Any]:
 
 def episode_from_dict(value: Mapping[str, Any]) -> Episode:
 
-    if value.get("schema_version") != EPISODE_SCHEMA_VERSION:
+    if value.get("schema_version") not in (1, EPISODE_SCHEMA_VERSION):
         raise ValueError("Unsupported episode schema version")
     return Episode(
         turns=tuple(_turn_from_dict(turn) for turn in value["turns"]),
@@ -168,6 +171,7 @@ def episode_from_dict(value: Mapping[str, Any]) -> Episode:
         team=value["team"],
         mano_offset=value["mano_offset"],
         target_score=value["target_score"],
+        ruleset_id=value["ruleset_id"] if value["schema_version"] == 2 else None,
     )
 
 

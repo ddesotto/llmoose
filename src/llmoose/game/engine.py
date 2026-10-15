@@ -1,4 +1,4 @@
-"""Authoritative legal-action and transition functions for Mus v1.
+"""Authoritative legal-action and transition functions for versioned Mus.
 
 The engine owns all rule validation. Policies receive an observation and can only
 return a proposed action; they never mutate or interpret ``GameState`` directly.
@@ -17,6 +17,7 @@ from llmoose.game.state import (
     Event,
     GameState,
     LanceResult,
+    PendingLance,
     Phase,
     Seat,
     deal_hand,
@@ -70,12 +71,17 @@ def legal_actions(state: GameState, seat: Seat) -> Tuple[Action, ...]:
         )
     if state.bidding_team == team_for(seat):
         raise RuntimeError("The bidding team cannot be asked to answer its own bet")
+    if state.ruleset.deferred_scoring and state.is_ordago:
+        return (Action(ActionKind.CALL), Action(ActionKind.FOLD))
+    minimum_raise = 2 if state.ruleset.deferred_scoring else 1
     responses = (
         Action(ActionKind.CALL),
         Action(ActionKind.FOLD),
-        *_stake_actions(ActionKind.RAISE, state.stake + 1, state.ruleset.target_score),
+        *_stake_actions(
+            ActionKind.RAISE, state.stake + minimum_raise, state.ruleset.target_score
+        ),
     )
-    if state.stake == state.ruleset.target_score:
+    if not state.ruleset.deferred_scoring and state.stake == state.ruleset.target_score:
         return responses
     return responses + (Action(ActionKind.ORDAGO),)
 
@@ -190,6 +196,7 @@ def _begin_juego_declaration(state: GameState) -> GameState:
         bidding_team=None,
         stake=0,
         refusal_points=0,
+        is_ordago=False,
     )
 
 
@@ -219,6 +226,7 @@ def _start_lance(
         bidding_team=None,
         stake=0,
         refusal_points=0,
+        is_ordago=False,
     )
 
 
@@ -244,7 +252,10 @@ def _apply_lance_action(state: GameState, actor: Seat, action: Action) -> GameSt
             if action.kind is ActionKind.ORDAGO
             else action.amount
         )
-        state = _event(state, "bid", actor, lance=lance.value, stake=str(stake))
+        detail = {"lance": lance.value, "stake": str(stake)}
+        if state.ruleset.deferred_scoring:
+            detail["action"] = action.kind.value
+        state = _event(state, "bid", actor, **detail)
         responders = _responders(state, actor)
         return replace(
             state,
@@ -253,16 +264,44 @@ def _apply_lance_action(state: GameState, actor: Seat, action: Action) -> GameSt
             stake=stake,
             refusal_points=refusal_points,
             passed_seats=(),
+            is_ordago=state.ruleset.deferred_scoring
+            and action.kind is ActionKind.ORDAGO,
         )
     if action.kind is ActionKind.FOLD:
         assert state.bidding_team is not None
         assert state.refusal_points > 0
         state = _event(state, "fold", actor, lance=lance.value)
+        if state.ruleset.deferred_scoring:
+            eligible = state.lance_seats
+            state = _award_lance(
+                state, lance, state.bidding_team, state.refusal_points, "fold"
+            )
+            if state.phase is Phase.COMPLETE:
+                return state
+            if lance in {Lance.PARES, Lance.JUEGO, Lance.PUNTO}:
+                return _defer_lance(
+                    state, lance, eligible, 0, "fold", len(state.lance_results) - 1
+                )
+            return _advance_lance(state, lance)
         return _resolve_lance(
             state, lance, state.bidding_team, state.refusal_points, "fold"
         )
     if action.kind is ActionKind.CALL:
         state = _event(state, "call", actor, lance=lance.value, stake=str(state.stake))
+        if state.ruleset.deferred_scoring:
+            if state.is_ordago:
+                winner = team_for(_winner(state, lance, state.lance_seats))
+                state = _reveal_hands(state)
+                state = replace(state, pending_lances=())
+                # An órdago wins the game, rather than adding a target-sized bet.
+                return _award_lance(
+                    state,
+                    lance,
+                    winner,
+                    state.ruleset.target_score - state.scores[winner],
+                    "ordago",
+                )
+            return _defer_lance(state, lance, state.lance_seats, state.stake, "called")
         winner = _winner(state, lance, state.lance_seats)
         points = (
             state.ruleset.target_score
@@ -276,6 +315,8 @@ def _apply_lance_action(state: GameState, actor: Seat, action: Action) -> GameSt
 def _resolve_natural_lance(
     state: GameState, lance: Lance, eligible: Sequence[Seat], reason: str
 ) -> GameState:
+    if state.ruleset.deferred_scoring:
+        return _defer_lance(state, lance, eligible, 0, reason)
     winner = _winner(state, lance, eligible)
     winning_team = team_for(winner)
     points = _natural_points(state, lance, winning_team, eligible)
@@ -312,30 +353,138 @@ def _natural_points(
 def _resolve_lance(
     state: GameState, lance: Lance, winning_team: int, points: int, reason: str
 ) -> GameState:
-    scores = list(state.scores)
-    scores[winning_team] += points
-    result = LanceResult(lance, winning_team, points, reason)
-    state = _event(
+    """Legacy immediate settlement; v2 defers comparisons to showdown."""
+    state = _award_lance(state, lance, winning_team, points, reason)
+    if state.phase is Phase.COMPLETE:
+        return state
+    return _advance_lance(state, lance)
+
+
+def _clear_bidding(state: GameState) -> GameState:
+    return replace(
         state,
-        "lance_resolved",
-        lance=lance.value,
-        team=str(winning_team),
-        points=str(points),
-        reason=reason,
-    )
-    state = replace(
-        state,
-        scores=tuple(scores),
         current_lance=None,
         lance_seats=(),
         passed_seats=(),
         bidding_team=None,
         stake=0,
         refusal_points=0,
-        lance_results=state.lance_results + (result,),
+        is_ordago=False,
+    )
+
+
+def _award_lance(
+    state: GameState,
+    lance: Lance,
+    winning_team: int,
+    points: int,
+    reason: str,
+    result_index: Optional[int] = None,
+) -> GameState:
+    scores = list(state.scores)
+    scores[winning_team] += points
+    results = list(state.lance_results)
+    if result_index is None:
+        results.append(LanceResult(lance, winning_team, points, reason))
+        state = _event(
+            state,
+            "lance_resolved",
+            lance=lance.value,
+            team=str(winning_team),
+            points=str(points),
+            reason=reason,
+        )
+    else:
+        result = results[result_index]
+        results[result_index] = replace(result, points=result.points + points)
+    if state.ruleset.deferred_scoring:
+        state = _event(
+            state,
+            "score_awarded",
+            lance=lance.value,
+            team=str(winning_team),
+            points=str(points),
+            reason=reason,
+            result_index=str(
+                len(results) - 1 if result_index is None else result_index
+            ),
+        )
+    state = replace(
+        _clear_bidding(state), scores=tuple(scores), lance_results=tuple(results)
     )
     if scores[winning_team] >= state.ruleset.target_score:
-        return replace(state, phase=Phase.COMPLETE, current_seat=None)
+        return replace(
+            state, phase=Phase.COMPLETE, current_seat=None, pending_lances=()
+        )
+    return state
+
+
+def _defer_lance(
+    state: GameState,
+    lance: Lance,
+    eligible: Sequence[Seat],
+    stake: int,
+    reason: str,
+    result_index: Optional[int] = None,
+) -> GameState:
+    pending = PendingLance(lance, tuple(eligible), stake, reason, result_index)
+    state = _event(
+        state, "lance_pending", lance=lance.value, stake=str(stake), reason=reason
+    )
+    state = replace(
+        _clear_bidding(state), pending_lances=state.pending_lances + (pending,)
+    )
+    return _advance_lance(state, lance)
+
+
+def _reveal_hands(state: GameState) -> GameState:
+    for seat in state.priority:
+        state = _event(
+            state,
+            "cards_revealed",
+            seat,
+            hand_number=str(state.hand_number),
+            cards=",".join(
+                f"{int(card.rank)}:{card.suit.value}" for card in state.hand_for(seat)
+            ),
+        )
+    return state
+
+
+def _settle_hand(state: GameState) -> GameState:
+    state = _reveal_hands(state)
+    pending = state.pending_lances
+    state = replace(state, pending_lances=())
+    for settlement in pending:
+        lance = settlement.lance
+        if settlement.result_index is None:
+            winning_team = team_for(_winner(state, lance, settlement.eligible))
+        else:
+            # Folding concedes intrinsic values too, even with the better hand.
+            winning_team = state.lance_results[settlement.result_index].winning_team
+        points = settlement.stake
+        if settlement.reason != "called" or lance in {
+            Lance.PARES,
+            Lance.JUEGO,
+            Lance.PUNTO,
+        }:
+            points += _natural_points(state, lance, winning_team, settlement.eligible)
+        state = _award_lance(
+            state,
+            lance,
+            winning_team,
+            points,
+            "fold_intrinsic"
+            if settlement.result_index is not None
+            else settlement.reason,
+            settlement.result_index,
+        )
+        if state.phase is Phase.COMPLETE:
+            return state
+    return state
+
+
+def _advance_lance(state: GameState, lance: Lance) -> GameState:
     if lance is Lance.GRANDE:
         return _start_lance(state, Lance.CHICA, Phase.CHICA, SEATS)
     if lance is Lance.CHICA:
@@ -347,11 +496,15 @@ def _resolve_lance(
         )
     if lance is Lance.PARES:
         return _begin_juego_declaration(state)
+    if state.ruleset.deferred_scoring:
+        state = _settle_hand(state)
+        if state.phase is Phase.COMPLETE:
+            return state
     return deal_hand(
         seed=state.seed,
         ruleset=state.ruleset,
         dealer=next_seat(state.dealer),
-        scores=tuple(scores),
+        scores=state.scores,
         hand_number=state.hand_number + 1,
         lance_results=state.lance_results,
         events=state.events,

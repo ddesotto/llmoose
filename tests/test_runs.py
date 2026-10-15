@@ -44,7 +44,7 @@ def legal_completion(messages):
     )
 
 
-@pytest.mark.parametrize("version", [1, 2])
+@pytest.mark.parametrize("version", [1, 2, 3])
 def test_run_links_model_attempts_to_replay_and_scores(tmp_path, monkeypatch, version):
     requests = []
 
@@ -85,6 +85,7 @@ def test_run_links_model_attempts_to_replay_and_scores(tmp_path, monkeypatch, ve
     final = replay_trace(trace)
     assert report["status"] == "completed"
     assert report["prompt_version"] == version
+    assert report["renderer_version"] == 2
     assert report["game"] == score_game(final, len(moves))
     assert report["game"]["actions"] == len(trace.actions)
     assert report["run_id"] == trace.metadata["run_id"]
@@ -103,6 +104,8 @@ def test_run_links_model_attempts_to_replay_and_scores(tmp_path, monkeypatch, ve
         assert record["seat"] == move["seat"]
         assert record["run_id"] == move["run_id"] == report["run_id"]
         assert record["prompt_version"] == version
+        assert record["renderer_version"] == 2
+        assert record["ruleset_id"] == trace.ruleset.id
         assert record["messages"][0]["content"].startswith(load_system_prompt(version))
         if record["status"] in ("chosen", "forced"):
             assert record["chosen_id"] == move["action_id"]

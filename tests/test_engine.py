@@ -7,7 +7,7 @@ from llmoose.game.engine import IllegalAction, apply_action, legal_actions
 from llmoose.game.state import Phase, Seat, freeze_hands, new_game
 from llmoose.observations.core import observe
 from llmoose.rules.cards import Card, Rank, Suit
-from llmoose.rules.ruleset import BidResponseProtocol, Ruleset
+from llmoose.rules.ruleset import LEGACY_RULESET_ID, BidResponseProtocol, Ruleset
 
 
 def _act(state, kind: ActionKind, amount: int = 0):
@@ -34,8 +34,8 @@ def test_mus_discard_round_redeals_each_hand_and_returns_to_vote() -> None:
     assert len(set(card for hand in state.hands.values() for card in hand)) == 16
 
 
-def test_called_bet_can_finish_a_match() -> None:
-    state = new_game(seed=9, ruleset=Ruleset(target_score=2))
+def test_legacy_called_bet_can_finish_a_match() -> None:
+    state = new_game(seed=9, ruleset=Ruleset(id=LEGACY_RULESET_ID, target_score=2))
     state = _act(state, ActionKind.NO_MUS)
     state = _act(state, ActionKind.BET, amount=2)
     state = _act(state, ActionKind.CALL)
@@ -59,7 +59,7 @@ def test_refusing_a_raise_awards_the_stake_before_the_raise() -> None:
     state = new_game(seed=1, ruleset=Ruleset(target_score=10))
     state = _act(state, ActionKind.NO_MUS)
     state = _act(state, ActionKind.BET, amount=2)
-    state = _act(state, ActionKind.RAISE, amount=3)
+    state = _act(state, ActionKind.RAISE, amount=4)
     state = _act(state, ActionKind.FOLD)
 
     assert state.lance_results[-1].points == 2
@@ -87,7 +87,9 @@ def test_ruleset_versions_the_next_opposing_seat_bid_response() -> None:
 
 
 @pytest.mark.parametrize("target_score", (8, 20))
-def test_uncontested_pares_scores_and_preserves_the_next_phase(target_score) -> None:
+def test_legacy_uncontested_pares_scores_and_preserves_the_next_phase(
+    target_score,
+) -> None:
     state = _state_with_hands(
         {
             Seat.NORTH: _hand(Rank.ACE, Rank.TWO, Rank.REY, Rank.THREE, suit_offset=0),
@@ -118,7 +120,9 @@ def test_uncontested_pares_scores_and_preserves_the_next_phase(target_score) -> 
 
 
 @pytest.mark.parametrize("target_score", (8, 20))
-def test_uncontested_juego_scores_and_preserves_the_next_phase(target_score) -> None:
+def test_legacy_uncontested_juego_scores_and_preserves_the_next_phase(
+    target_score,
+) -> None:
     state = _state_with_hands(
         {
             Seat.NORTH: _hand(
@@ -181,7 +185,9 @@ def test_frozen_state_does_not_expose_mutable_hands() -> None:
 
 
 def _state_with_hands(hands, target_score: int = 20):
-    state = new_game(seed=1, ruleset=Ruleset(target_score=target_score))
+    state = new_game(
+        seed=1, ruleset=Ruleset(id=LEGACY_RULESET_ID, target_score=target_score)
+    )
     return replace(state, hands=freeze_hands(hands))
 
 

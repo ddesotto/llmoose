@@ -8,7 +8,12 @@ from time import perf_counter
 from typing import Callable, Mapping, Sequence
 
 from llmoose.agents.baselines import ConservativePolicy
-from llmoose.agents.prompt import PROMPT_VERSION, load_system_prompt, render_messages
+from llmoose.agents.prompt import (
+    PROMPT_VERSION,
+    RENDERER_VERSION,
+    load_system_prompt,
+    render_messages,
+)
 from llmoose.agents.providers import Completion, ProviderError
 from llmoose.game.actions import Action, ActionCodec
 from llmoose.observations.core import Observation
@@ -70,6 +75,8 @@ class StructuredLLMPolicy:
             "schema_version": 1,
             "decision_index": self.telemetry.decisions - 1,
             "prompt_version": self.prompt_version,
+            "renderer_version": RENDERER_VERSION,
+            "ruleset_id": observation.ruleset_id,
             "seat": int(observation.seat),
             "hand_number": observation.hand_number,
             "phase": observation.phase.value,

@@ -1,0 +1,58 @@
+{
+  "actions": [
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "mus"
+    },
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "no_mus"
+    },
+    {
+      "amount": 3,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "call"
+    },
+    {
+      "amount": 2,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 8,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "call"
+    }
+  ],
+  "dealer": 0,
+  "metadata": {
+    "engine_commit": "1c5baf2878ece73ddb17b09054280d7eb700891b",
+    "scope": "Legacy scoring after the medias fix"
+  },
+  "ruleset": {
+    "bid_response_protocol": "next_opposing_seat",
+    "communication": "disabled",
+    "id": "mus_8r8a_no_senas_v1",
+    "mus_protocol": "individual_unanimous",
+    "target_score": 8
+  },
+  "schema_version": 1,
+  "scores": [
+    3,
+    8
+  ],
+  "seed": 4,
+  "winner": 1
+}

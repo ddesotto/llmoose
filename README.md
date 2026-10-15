@@ -12,10 +12,95 @@ explorer. It works offline. Progress is browser-local and can be exported/import
 it does not edit `TODO.md`. Rebuild after source changes with
 `.venv/bin/python scripts/build_dashboard.py`.
 
-The [game and prompt audit](docs/game-and-prompt.md) documents a confirmed hand
-ranking defect and unresolved differences from reference Mus rules. The current
-environment is suitable for development experiments; these findings need resolution
-before treating its outcomes as validated benchmark scores or training labels.
+The [game and prompt audit](docs/game-and-prompt.md) records the historical ranking
+and scoring findings. The ranking fix and the federation-based scoring contract
+below are implemented; the broader rules audit and player-interface work remain
+tracked in [TODO.md](TODO.md).
+
+## Rules contract
+
+New games default to **`mus_8r8a_federation_no_senas_v2`**. This is a benchmark
+adaptation of the Federación de Mus rules dated **16-02-2025, V.7**, particularly
+articles 44, 61–62, 69–71: accepted bets settle at hand-end, refusal points are
+paid during bidding, cards are revealed at showdown, and an accepted órdago
+overrides earlier accepted bets. See the [reference regulation](https://lafederaciondemus.es/wp-content/uploads/2026/02/Reglamento-de-Juego-Federacion.pdf).
+The [Pagat explanation](https://www.pagat.com/vying/mus.html) supplies comparison
+examples, intrinsic hand values, and a minimum raise increment of two.
+
+Four seats form two partnerships. Each receives four cards from the 40-card
+Spanish deck, with twos equivalent to aces and threes equivalent to kings.
+Suits do not affect comparisons. Grande compares descending ranks, chica ascending
+ranks. Pares orders duples (including four equal) above medias above a pair;
+singletons do not break ties. Juego requires at least 31, ordered
+31, 32, 40, 37, 36, 35, 34, 33. If nobody has juego, highest total wins punto.
+The best eligible individual hand wins for its team; ties follow priority from mano.
+No juego real exception is used. Pares and juego declarations are truthful.
+Only eligible seats participate; a sole eligible team wins without betting.
+
+The v2 settlement contract is:
+
+| Outcome | Paid immediately | Paid at showdown |
+| --- | --- | --- |
+| All pass, or an uncontested lance | Nothing | Natural value |
+| Numeric bet called | Nothing | Stake, plus intrinsic value for pares/juego/punto |
+| Opening bet or opening órdago refused | 1 to the bidding team | That team's intrinsic value for pares/juego/punto |
+| Raise or raised órdago refused | Previous numeric stake to the bidding team | That team's intrinsic value for pares/juego/punto |
+| Órdago called | Match won by the best eligible hand's team | All pending awards cancelled |
+
+Natural values are 1 for grande/chica/punto; for pares, sum the winning team's
+eligible hands (pair 1, medias 2, duples 3); for juego, sum its qualifying hands
+(31 scores 3, other qualifying totals 2). Punto's intrinsic value is 1, including
+after a call or fold. Called grande/chica pay only the stake; folded grande/chica
+have no further award. There is no additional *deje* on a refused raise.
+
+At ordinary showdown all four hands become public, then settlement proceeds in
+grande → chica → pares → juego/punto order. Stop at the first team reaching the
+target; later pending awards are not paid. Immediate refusal points can end a
+match before showdown, even if an earlier accepted bet would favor the other team.
+A fold concedes the intrinsic values as well, regardless of who held better cards.
+Already-paid refusal points are never paid again. A called órdago raises the
+winner's displayed score to the target, preserving the loser's paid score; this
+is a terminal encoding, not a target-sized stone bonus.
+
+For example, bet 2 → raise to 6 → fold pays 2 immediately to the raiser's team.
+At pares, if that team holds medias plus a pair, it receives 3 more at showdown
+unless the match ends first. Conversely, calling a numeric bet of 40 at grande
+does not end bidding on the hand: a later accepted órdago at chica can overturn it.
+
+Explicit benchmark adaptations retained in v2:
+
+- One game to a configurable target (default 40), rather than a multi-game match.
+- No señas, dialogue, simultaneous speech, revocation of a partner's answer,
+  physical dealing faults, tournament penalties, or special invalid-órdago claims.
+  The next eligible opposing seat gives one binding team response.
+- The finite numeric menu runs from 2 to the target, with raises increasing the
+  total by at least 2. Reference play permits larger bets; a menu-limit numeric
+  bet remains distinct from órdago and can itself be answered with órdago.
+- The existing deterministic seat/deal schedule is retained: NORTH → EAST →
+  SOUTH → WEST, priority starting at `(dealer - 1) mod 4`. This is a simulation
+  convention rather than a reproduction of physical dealer/postre seating.
+- Mus votes are sequential and unanimous; each seat discards 1–4 cards, starting
+  at mano. Recycling retains the existing algorithm: if stock cannot fill a draw,
+  shuffle all accumulated discards, including that player's new discards, into
+  the available stock. Recycled cards are drawn before the residual stock.
+
+Replay selects behavior by the saved ruleset ID. **`mus_8r8a_no_senas_v1`** retains
+immediate scoring, one-stone raise increments, no public reveals, and the old
+numeric-target/órdago equivalence. Use `--ruleset mus_8r8a_no_senas_v1` for that
+legacy environment. Unknown IDs are rejected; trace schema 1 and old files remain
+readable. Both rulesets use the corrected hand evaluator: pre-fix traces affected
+by the medias bug require their original engine commit, and replay rejects an
+outcome mismatch rather than rewriting the artifact.
+New training episodes use schema 2 and record their ruleset ID. Schema 1 episodes
+remain readable with unknown ruleset provenance (`null`), without guessing from
+their rewards or assigning the new default retroactively.
+
+For v2 logs, `lance_pending` records public settlement terms without revealing a
+winner. `score_awarded` events are the score-delta ledger. Each folded lance has
+one result, first recording refusal points and later accumulating intrinsic points;
+`fold_intrinsic` awards reference its result index. Count that lance once in reports.
+`cards_revealed` events contain the completed hand's physical cards. Historical
+v1 logs continue to use `lance_resolved` events for score deltas.
 
 
 # Code
@@ -255,18 +340,19 @@ even a 40-point match early. Use multiple seeded games for performance compariso
 
 Game instructions live in
 [`src/llmoose/agents/system_prompts/`](src/llmoose/agents/system_prompts/).
-`v1.txt` preserves the original instructions; **`v2.txt` is the condensed default**.
+`v1.txt` and `v2.txt` preserve the original instructions; **`v3.txt` is the default**
+and explains the new settlement contract and the legacy exception.
 Every model uses the same selected instructions, followed by its seat/team role.
 Private cards, public history, and legal choices stay in the user message.
 
-Use `--prompt-version 1` or `--prompt-version 2` to select a version. Logs and
-reports record it, and training renderers accept the same `prompt_version`.
+Use `--prompt-version 1`, `2`, or `3` to select a version. Logs and reports record
+it and renderer version 2, and training renderers accept the same `prompt_version`.
 Keep published versions unchanged: add a new `vN.txt` and register it in
-`agents/prompt.py` when changing instructions. Both files ship with the package.
+`agents/prompt.py` when changing instructions. All versions ship with the package.
 
-The current default is a compact reminder, not yet a complete explanation of the
-player interface. See the [prompt review](docs/game-and-prompt.md) for missing
-action consequences, score timing, private recall, and the planned next version.
+The renderer supplies the ruleset, outstanding órdago flag, and pending settlement
+terms. Private recall and context limits remain follow-ups in the
+[prompt review](docs/game-and-prompt.md); v3 does not implement those capabilities.
 
 Request settings are `--max-tokens` (1024), `--temperature` (0), and `--timeout`
 (60 seconds). If reasoning uses up the token budget before an answer, increase

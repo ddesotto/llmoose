@@ -91,8 +91,16 @@ class TerminalSpectator:
                 flush=True,
             )
         scores = list(before.scores)
+        award_event = (
+            "score_awarded" if before.ruleset.deferred_scoring else "lance_resolved"
+        )
         for event in after.events[len(before.events) :]:
-            if event.kind == "lance_resolved":
+            if event.kind == "lance_pending":
+                print(
+                    f"       {dict(event.detail)['lance'].title()}: pending showdown",
+                    flush=True,
+                )
+            if event.kind == award_event:
                 detail = dict(event.detail)
                 team = int(detail["team"])
                 points = int(detail["points"])

@@ -9,9 +9,10 @@ from typing import Optional, Tuple
 
 from llmoose.game.actions import ActionCodec
 from llmoose.game.engine import legal_actions
-from llmoose.game.state import Event, GameState, Phase, Seat, team_for
+from llmoose.game.state import Event, GameState, PendingLance, Phase, Seat, team_for
 from llmoose.rules.cards import Card
 from llmoose.rules.hands import Lance
+from llmoose.rules.ruleset import LEGACY_RULESET_ID
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,9 @@ class Observation:
     stake: int
     bidding_team: Optional[int]
     refusal_points: int
+    ruleset_id: str = LEGACY_RULESET_ID
+    is_ordago: bool = False
+    pending_lances: Tuple[PendingLance, ...] = ()
 
 
 def observe(
@@ -58,4 +62,7 @@ def observe(
         stake=state.stake,
         bidding_team=state.bidding_team,
         refusal_points=state.refusal_points,
+        ruleset_id=state.ruleset.id,
+        is_ordago=state.is_ordago,
+        pending_lances=state.pending_lances,
     )

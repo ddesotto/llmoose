@@ -1,11 +1,17 @@
-"""
-Source:  https://lafederaciondemus.es/wp-content/uploads/2026/02/Reglamento-de-Juego-Federacion.pdf
+"""Versioned benchmark adaptations of eight-kings/eight-aces Mus.
+
+See README.md's rules contract for the reference and explicit adaptations.
+The v1 identifier retains the original immediate-scoring transitions for replay.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+
+LEGACY_RULESET_ID = "mus_8r8a_no_senas_v1"
+FEDERATION_RULESET_ID = "mus_8r8a_federation_no_senas_v2"
+RULESET_IDS = (LEGACY_RULESET_ID, FEDERATION_RULESET_ID)
 
 
 class MusProtocol(str, Enum):
@@ -27,7 +33,7 @@ class CommunicationMode(str, Enum):
 @dataclass(frozen=True)
 class Ruleset:
     # the 8 kings, 8 aces (1=2, 3=king), no señas variant
-    id: str = "mus_8r8a_no_senas_v1"
+    id: str = FEDERATION_RULESET_ID
     target_score: int = 40
 
     # how to decide when to "mus" (vote to continue playing) and when to "no mus" (stop playing)
@@ -41,5 +47,11 @@ class Ruleset:
     communication: CommunicationMode = CommunicationMode.DISABLED
 
     def __post_init__(self) -> None:
+        if self.id not in RULESET_IDS:
+            raise ValueError(f"Unsupported ruleset: {self.id}")
         if self.target_score < 2:
             raise ValueError("target_score must be at least 2")
+
+    @property
+    def deferred_scoring(self) -> bool:
+        return self.id == FEDERATION_RULESET_ID

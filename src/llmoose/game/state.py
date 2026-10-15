@@ -72,7 +72,7 @@ class Phase(str, Enum):
 
 @dataclass(frozen=True)
 class Event:
-    """A public, replayable event. Card identities never appear here."""
+    """A public event; v2 card identities appear only at showdown."""
 
     index: int
     kind: str
@@ -86,6 +86,21 @@ class LanceResult:
     winning_team: int
     points: int
     reason: str
+
+
+@dataclass(frozen=True)
+class PendingLance:
+    """Public settlement terms, without a hidden-hand comparison or winner.
+
+    A folded lance references its already-paid refusal result. Its intrinsic
+    value is added to that same result at showdown, avoiding a second lance win.
+    """
+
+    lance: Lance
+    eligible: Tuple[Seat, ...]
+    stake: int
+    reason: str
+    result_index: Optional[int] = None
 
 
 def freeze_hands(
@@ -126,6 +141,8 @@ class GameState:
     refusal_points: int = 0
     lance_results: Tuple[LanceResult, ...] = ()
     events: Tuple[Event, ...] = ()
+    is_ordago: bool = False
+    pending_lances: Tuple[PendingLance, ...] = ()
 
     @property
     def priority(self) -> Tuple[Seat, ...]:

@@ -15,11 +15,11 @@ from uuid import uuid4
 from dotenv import load_dotenv
 
 from llmoose.agents.factory import POLICY_NAMES, build_policies
-from llmoose.agents.prompt import PROMPT_VERSION, PROMPT_VERSIONS
+from llmoose.agents.prompt import PROMPT_VERSION, PROMPT_VERSIONS, RENDERER_VERSION
 from llmoose.agents.providers import OPENROUTER_BASE_URL, ChatCompletionProvider
 from llmoose.game.actions import ActionCodec
 from llmoose.game.state import SEATS, new_game, team_for
-from llmoose.rules.ruleset import Ruleset
+from llmoose.rules.ruleset import FEDERATION_RULESET_ID, RULESET_IDS, Ruleset
 from llmoose.simulation.match import run_match
 from llmoose.simulation.reporting import DecisionReporter, llm_summary, match_summary
 from llmoose.simulation.runs import RunRecorder
@@ -39,7 +39,7 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
     except ValueError as exc:
         parser.error(str(exc))
 
-    ruleset = Ruleset(target_score=args.target_score)
+    ruleset = Ruleset(id=args.ruleset, target_score=args.target_score)
     directory = Path(args.run_dir) if args.run_dir else None
     if directory is not None:
         try:
@@ -57,6 +57,7 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
         "requested_model": args.model,
         "base_url": args.base_url if provider is not None else None,
         "prompt_version": args.prompt_version,
+        "renderer_version": RENDERER_VERSION,
         "temperature": args.temperature,
         "max_tokens": args.max_tokens,
         "timeout": args.timeout,
@@ -141,9 +142,12 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run a seeded no-señas Mus v1 match")
+    parser = argparse.ArgumentParser(
+        description="Run a seeded, versioned no-señas Mus match"
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--target-score", type=int, default=40)
+    parser.add_argument("--ruleset", choices=RULESET_IDS, default=FEDERATION_RULESET_ID)
     parser.add_argument(
         "--policy",
         choices=POLICY_NAMES,

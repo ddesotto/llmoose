@@ -4,7 +4,22 @@ from io import BytesIO
 import pytest
 
 from llmoose.cli import play_command
+from llmoose.rules.ruleset import RULESET_IDS
 from llmoose.simulation.traces import load_trace, replay_trace
+
+
+@pytest.mark.parametrize("ruleset_id", RULESET_IDS)
+def test_cli_records_selected_ruleset_and_replays_it(tmp_path, ruleset_id):
+    path = tmp_path / "match.json"
+    assert (
+        play_command(
+            ["--ruleset", ruleset_id, "--target-score", "4", "--trace", str(path)]
+        )
+        == 0
+    )
+    trace = load_trace(path)
+    assert trace.ruleset.id == ruleset_id
+    assert replay_trace(trace).scores == trace.scores
 
 
 @pytest.mark.parametrize("model_override", [None, "shell/model", "cli/model"])
