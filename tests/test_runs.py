@@ -86,6 +86,7 @@ def test_run_links_model_attempts_to_replay_and_scores(tmp_path, monkeypatch, ve
     assert report["status"] == "completed"
     assert report["prompt_version"] == version
     assert report["renderer_version"] == (2 if version <= 3 else 3)
+    assert trace.metadata["renderer_version"] == str(2 if version <= 3 else 3)
     assert report["game"] == score_game(final, len(moves))
     assert report["game"]["actions"] == len(trace.actions)
     assert report["run_id"] == trace.metadata["run_id"]

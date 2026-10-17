@@ -123,6 +123,9 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
                         model=args.model,
                         llm_strict=str(args.llm_strict),
                         prompt_version=str(args.prompt_version),
+                        renderer_version=str(
+                            renderer_version_for_prompt(args.prompt_version)
+                        ),
                     )
                 if directory is not None:
                     trace_metadata["run_id"] = metadata["run_id"]

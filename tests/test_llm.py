@@ -228,6 +228,7 @@ def test_forced_declarations_do_not_call_the_provider():
     policy = StructuredLLMPolicy(codec, unexpected, on_record=records.append)
     obs = observe(state, state.current_seat, codec)
     assert obs.legal_action_mask[codec.encode(policy.act(obs))]
+    assert "truthful" in render_observation(obs)
     assert policy.telemetry.forced_actions == 1
     assert policy.telemetry.requests == 0
     assert records[0]["status"] == "forced"
