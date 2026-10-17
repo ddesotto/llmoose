@@ -67,14 +67,16 @@ def mirrored_baseline() -> dict:
                 for seat in SEATS
             }
             result = run_match(policies, seed=seed, ruleset=rules)
-            rows.append({
-                "seed": seed,
-                "candidate_team": candidate_team,
-                "candidate_won": result.winner == candidate_team,
-                "scores": list(result.scores),
-                "candidate_margin": result.scores[candidate_team]
-                - result.scores[1 - candidate_team],
-            })
+            rows.append(
+                {
+                    "seed": seed,
+                    "candidate_team": candidate_team,
+                    "candidate_won": result.winner == candidate_team,
+                    "scores": list(result.scores),
+                    "candidate_margin": result.scores[candidate_team]
+                    - result.scores[1 - candidate_team],
+                }
+            )
     return {
         "candidate": "heuristic",
         "opponent": "conservative",
@@ -137,9 +139,16 @@ def summarize_run(path: Path) -> dict:
         "usage": report["llm"]["total"]["usage"],
         "lance_results": [team["by_lance"] for team in game["teams"]],
         "last_two_moves": [
-            {key: move[key] for key in (
-                "action_index", "seat", "action", "scores_before", "scores_after"
-            )}
+            {
+                key: move[key]
+                for key in (
+                    "action_index",
+                    "seat",
+                    "action",
+                    "scores_before",
+                    "scores_after",
+                )
+            }
             for move in moves[-2:]
         ],
     }
@@ -174,18 +183,24 @@ def main() -> None:
         "src/llmoose/agents/system_prompts/v2.txt",
         "scripts/review_evidence.py",
     )
-    print(json.dumps({
-        "schema": "llmoose.review-evidence.v1",
-        "python_version": platform.python_version(),
-        "source_sha256": {name: sha256(ROOT / name) for name in sources},
-        "medias_ranking_check": ranking_check(),
-        "mirrored_baseline": mirrored_baseline(),
-        "runs": [
-            summarize_run(args.runs_dir / name)
-            for name in ("llm-first", "llm-long-40")
-        ],
-        "scope": "Local artifacts, deterministic checks, and offline baselines; no model requests.",
-    }, indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "schema": "llmoose.review-evidence.v1",
+                "python_version": platform.python_version(),
+                "source_sha256": {name: sha256(ROOT / name) for name in sources},
+                "medias_ranking_check": ranking_check(),
+                "mirrored_baseline": mirrored_baseline(),
+                "runs": [
+                    summarize_run(args.runs_dir / name)
+                    for name in ("llm-first", "llm-long-40")
+                ],
+                "scope": "Local artifacts, deterministic checks, and offline baselines; no model requests.",
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":

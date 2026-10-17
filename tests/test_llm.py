@@ -5,12 +5,14 @@ from urllib.error import HTTPError, URLError
 
 import pytest
 
+from llmoose.agents.baselines import ConservativePolicy
 from llmoose.agents.llm import InvalidModelAction, StructuredLLMPolicy, parse_action
 from llmoose.agents.prompt import render_messages, render_observation, render_prompt
 from llmoose.agents.providers import ChatCompletionProvider, Completion, ProviderError
 from llmoose.game.actions import Action, ActionCodec, ActionKind
+from llmoose.game.engine import apply_action
 from llmoose.game.environment import MusEnv
-from llmoose.game.state import SEATS, Phase, Seat, freeze_hands, new_game
+from llmoose.game.state import SEATS, Event, Phase, Seat, freeze_hands, new_game
 from llmoose.observations.core import observe
 from llmoose.rules.ruleset import Ruleset
 from llmoose.training import collect_episode
@@ -25,12 +27,18 @@ def test_prompts_include_position_cards_and_only_legal_choices():
     env, observation = opening()
     prompt = render_observation(observation)
     assert "You: WEST (team 1); partner: EAST" in prompt
-    assert "Mano: WEST; mano_offset: 0" in prompt
+    assert (
+        "Mano: WEST; tie priority: WEST → NORTH → EAST → SOUTH; mano_offset: 0"
+        in prompt
+    )
     assert "Target: 8 stones" in prompt
     for index, card in enumerate(observation.private_hand):
         assert f"{index}: {int(card.rank)} of {card.suit.value}" in prompt
     actions = prompt.split("Legal actions (ID: meaning):\n")[1]
-    assert actions == "  0: mus\n  1: no mus"
+    assert actions == (
+        "  0: mus — vote to exchange cards if all four seats agree\n"
+        "  1: no mus — stop exchanges and begin grande now"
+    )
     messages = render_messages(observation)
     assert messages[1]["content"] == prompt
     assert "mano_offset 0" in messages[0]["content"]
@@ -65,6 +73,70 @@ def test_observation_exposes_public_bidding_context():
     assert "Current stake: 3; bidding team: 1; fold awards: 1" in render_observation(
         observation
     )
+    rendered = render_observation(observation)
+    assert "Eligible seats for active lance: WEST, NORTH, EAST, SOUTH" in rendered
+    assert "Binding response: NORTH acts for their whole team" in rendered
+    assert "fold — concede for your team; bidding team 1 receives 1 now" in rendered
+
+
+def test_private_discard_recall_is_seat_scoped_and_resets_on_new_hand():
+    state = new_game(12, Ruleset(target_score=40))
+    codec = ActionCodec(40)
+    old_card = state.hands[Seat.WEST][0]
+    for _ in range(4):
+        state = apply_action(state, Action(ActionKind.MUS))
+    state = apply_action(state, Action(ActionKind.DISCARD, card_indices=(0,)))
+    west = observe(state, Seat.WEST, codec)
+    east = observe(state, Seat.EAST, codec)
+    assert west.own_discard_history == ((old_card,),)
+    assert east.own_discard_history == ()
+    seen = f"{int(old_card.rank)} of {old_card.suit.value}"
+    assert seen in render_observation(west).split("Your earlier discards this hand")[1]
+    assert seen not in render_observation(east)
+    policy = ConservativePolicy(codec)
+    start_hand = state.hand_number
+    for _ in range(80):
+        if state.hand_number != start_hand or state.phase is Phase.COMPLETE:
+            break
+        actor = state.current_seat
+        state = apply_action(state, policy.act(observe(state, actor, codec)))
+    assert state.hand_number == start_hand + 1
+    assert state.own_discard_history == ((), (), (), ())
+
+
+def test_prior_history_is_bounded_and_current_hand_history_is_complete():
+    _, observation = opening()
+    events = []
+    for hand_number in range(6):
+        events.append(
+            Event(
+                len(events),
+                "dealt",
+                detail=(("hand_number", str(hand_number)),),
+            )
+        )
+        events.append(Event(len(events), "pass", Seat.WEST))
+    observation = replace(observation, public_events=tuple(events), hand_number=5)
+    rendered = render_observation(observation)
+    assert (
+        "Earlier public hands: 5 recorded; last 3 summarized; 2 older omitted."
+        in rendered
+    )
+    assert "hand 3: bids=0, folds=0" in rendered
+    assert "hand 2: bids=0" not in rendered
+    assert f"  {events[-1].index}: WEST pass" in rendered
+    assert "Current hand public history (complete):" in rendered
+
+
+def test_near_target_ordago_menu_explains_match_and_refusal():
+    state = replace(new_game(12, Ruleset(target_score=40)), scores=(39, 39))
+    state = apply_action(state, Action(ActionKind.NO_MUS))
+    state = apply_action(state, Action(ActionKind.ORDAGO))
+    rendered = render_observation(observe(state, state.current_seat, ActionCodec(40)))
+    assert "team 0=39, team 1=39" in rendered
+    assert "call — accept órdago; best eligible hand wins the match now" in rendered
+    assert "fold — concede for your team; bidding team 1 receives 1 now" in rendered
+    assert "Current hand public history (complete):" in rendered
 
 
 @pytest.mark.parametrize(

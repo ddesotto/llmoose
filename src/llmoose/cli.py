@@ -15,7 +15,11 @@ from uuid import uuid4
 from dotenv import load_dotenv
 
 from llmoose.agents.factory import POLICY_NAMES, build_policies
-from llmoose.agents.prompt import PROMPT_VERSION, PROMPT_VERSIONS, RENDERER_VERSION
+from llmoose.agents.prompt import (
+    PROMPT_VERSION,
+    PROMPT_VERSIONS,
+    renderer_version_for_prompt,
+)
 from llmoose.agents.providers import OPENROUTER_BASE_URL, ChatCompletionProvider
 from llmoose.game.actions import ActionCodec
 from llmoose.game.state import SEATS, new_game, team_for
@@ -57,7 +61,7 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
         "requested_model": args.model,
         "base_url": args.base_url if provider is not None else None,
         "prompt_version": args.prompt_version,
-        "renderer_version": RENDERER_VERSION,
+        "renderer_version": renderer_version_for_prompt(args.prompt_version),
         "temperature": args.temperature,
         "max_tokens": args.max_tokens,
         "timeout": args.timeout,

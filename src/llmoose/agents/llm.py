@@ -10,9 +10,9 @@ from typing import Callable, Mapping, Sequence
 from llmoose.agents.baselines import ConservativePolicy
 from llmoose.agents.prompt import (
     PROMPT_VERSION,
-    RENDERER_VERSION,
     load_system_prompt,
     render_messages,
+    renderer_version_for_prompt,
 )
 from llmoose.agents.providers import Completion, ProviderError
 from llmoose.game.actions import Action, ActionCodec
@@ -75,7 +75,7 @@ class StructuredLLMPolicy:
             "schema_version": 1,
             "decision_index": self.telemetry.decisions - 1,
             "prompt_version": self.prompt_version,
-            "renderer_version": RENDERER_VERSION,
+            "renderer_version": renderer_version_for_prompt(self.prompt_version),
             "ruleset_id": observation.ruleset_id,
             "seat": int(observation.seat),
             "hand_number": observation.hand_number,

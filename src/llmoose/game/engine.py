@@ -129,6 +129,8 @@ def _apply_discard(state: GameState, actor: Seat, action: Action) -> GameState:
     hands[actor] = kept + replacements
     counts = list(state.discard_counts)
     counts[int(actor)] += len(removed)
+    history = list(state.own_discard_history)
+    history[int(actor)] += (removed,)
     state = _event(state, "discard", actor, count=str(len(removed)))
     state = replace(
         state,
@@ -136,6 +138,7 @@ def _apply_discard(state: GameState, actor: Seat, action: Action) -> GameState:
         stock=stock,
         discards=discards,
         discard_counts=tuple(counts),
+        own_discard_history=tuple(history),
     )
     if actor == state.priority[-1]:
         return replace(

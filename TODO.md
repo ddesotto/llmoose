@@ -67,12 +67,12 @@ Use development suites during iteration and reserve test suites for final compar
       Document explicit deviations from the selected reference rules.
 - [x] Resolve the engine's equivalence of a numeric bet at the target and órdago.
       Preserve a distinct action/event flag if semantics differ.
-- [ ] Add independent expected-result fixtures for each comparison, eligibility,
+- [x] Add independent expected-result fixtures for each comparison, eligibility,
       tie, betting chain, uncontested award, score threshold, and órdago outcome.
-      Scoring/órdago fixtures now cover every lance in `test_federation_scoring.py`;
-      finish the comparison/eligibility matrix, including equal triples with
-      different singletons.
-      Deterministic replay of the same engine is not an independent rules oracle.
+      `test_rules_contract.py` states comparison and mano tie outcomes from the
+      rules contract; `test_federation_scoring.py` checks eligibility and scoring
+      transitions against explicit expected results. Deterministic replay of the
+      same engine is not an independent rules oracle.
 - [x] Version scoring semantics and reconcile affected docstrings. Preserve old
       trace IDs/files and reject unsupported rulesets. The legacy fixture records
       its source commit; pre-medias-fix traces still need their original evaluator.
@@ -88,22 +88,23 @@ all scoring and transition paths, with known deviations explicitly named.
 - [x] Add prompt v3 without rewriting v1/v2. Explain four-card hands,
       physical deck composition, normalized rank order, juego threshold, mano,
       explicit table order, the hand lifecycle, and the partnership win condition.
-- [ ] Define every action and its consequences. Explain pass versus fold, binding
+- [x] Define every action and its consequences. Explain pass versus fold, binding
       team responses, the best eligible individual hand, declarations, and
       uncontested lances. State whether intrinsic values add to bets.
 - [x] Explain score timing and that displayed totals already include resolved
       awards. Include worked comparisons and a bet–raise–fold example.
-- [ ] Render player-facing context instead of unexplained enum labels: active
+- [x] Render player-facing context instead of unexplained enum labels: active
       lance, eligible seats, tie order, bidding team, and recipient of refusal points.
       Mark discard counts as cumulative within the hand; describe contextual actions.
-- [ ] Preserve same-seat private recall of previously seen cards/own discards.
-      Current calls are fresh and contain only current cards plus public history.
-      Keep partners' private memories separate.
-- [ ] Version the renderer/history policy as well as system text. Define context
-      limits and past-hand summaries without silently losing current decision data.
-- [ ] Decide whether hand-evaluation summaries are provided. If so, label and
-      evaluate that assistance consistently rather than calling it learned knowledge.
-- [ ] Check scenarios for coverage and private-information invariance, including
+- [x] Preserve same-seat private recall of own discards within the current hand.
+      The current cards plus those discards cover cards that seat has seen this
+      hand. Keep partners' private memories separate and reset on the next deal.
+- [x] Version the renderer/history policy as well as system text. Renderer 3 keeps
+      current-hand events complete and summarizes the last three prior public
+      hands, explicitly counting older hands omitted.
+- [x] Do not provide hand-evaluation summaries; the player must evaluate its own
+      cards. Document this assistance boundary in the player-interface contract.
+- [x] Check scenarios for coverage and private-information invariance, including
       recall isolation, forced declarations, and near-target situations.
 
 **Done when:** a player can explain all offered actions from its input alone,

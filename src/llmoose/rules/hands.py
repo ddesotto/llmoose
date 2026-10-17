@@ -4,9 +4,13 @@ Source: https://www.pagat.com/vying/mus.html ("Grande", "Chica", "Pares", and "J
 
 Grande: biggest rank wins, with 2=1 and 3=King.  Ties are broken by the next-highest card, then the next, then the next.
 Chica: smallest rank wins, with 2=1 and 3=King.  Ties are broken by the next-lowest card, then the next, then the next.
-Pares: 0, 1, or 2 pairs of equal rank.  A pair of 2s is worth the same as a pair of Kings.  Ties are broken by the highest pair, then the next pair, then the next pair, then the kicker.
-Juego: 31 is the best, then 32, then 40, then 37, 36, 35, 34, 33.  Ties are broken by the next-highest card, then the next, then the next.  If a hand has no Juego (total < 31), it is not eligible to win this lance.
-Punto (only played if no one has Juego): 30 is the best, then 29, then 28, then 27, then 26, then 25, then 24, then 23, then 22, then 21.  Ties are broken by the next-highest card, then the next, then the next.
+Pares: duples (two pairs or four of a kind) beat medias (three of a kind),
+which beat a simple pair. Compare paired ranks within a category; unpaired
+cards do not break ties. Twos count as aces and threes as kings.
+Juego: qualifying totals rank 31, 32, 40, 37, 36, 35, 34, 33. Equal totals
+tie regardless of individual ranks; totals below 31 are ineligible.
+Punto (only played if nobody has Juego): the higher total wins. Equal totals
+tie regardless of individual ranks.
 """
 
 from __future__ import annotations

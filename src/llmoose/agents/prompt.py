@@ -10,9 +10,16 @@ from llmoose.game.state import Seat
 from llmoose.observations.core import Observation
 from llmoose.rules.ruleset import FEDERATION_RULESET_ID
 
-PROMPT_VERSION = 3
-PROMPT_VERSIONS = (1, 2, 3)
-RENDERER_VERSION = 2
+PROMPT_VERSION = 4
+PROMPT_VERSIONS = (1, 2, 3, 4)
+RENDERER_VERSION = 3
+PRIOR_HAND_SUMMARY_LIMIT = 3
+
+
+def renderer_version_for_prompt(version: int) -> int:
+    if version not in PROMPT_VERSIONS:
+        raise ValueError(f"Unknown prompt version: {version}")
+    return 2 if version <= 3 else RENDERER_VERSION
 
 
 @lru_cache(maxsize=None)
@@ -39,7 +46,7 @@ def describe_action(action: Action) -> str:
     return action.kind.value.replace("_", " ")
 
 
-def render_observation(observation: Observation) -> str:
+def _render_observation_v2(observation: Observation) -> str:
     """Render only the acting seat's observation, never a full game state."""
     codec = ActionCodec(observation.target_score)
     if len(observation.legal_action_mask) != codec.size:
@@ -101,6 +108,187 @@ def render_observation(observation: Observation) -> str:
     return "\n".join(lines)
 
 
+def _current_and_prior_events(observation: Observation):
+    events = observation.public_events
+    current_start = max(
+        (index for index, event in enumerate(events) if event.kind == "dealt"),
+        default=0,
+    )
+    return events[:current_start], events[current_start:]
+
+
+def _prior_hand_summaries(events):
+    groups = []
+    for event in events:
+        if event.kind == "dealt":
+            groups.append([event])
+        elif groups:
+            groups[-1].append(event)
+    omitted = max(0, len(groups) - PRIOR_HAND_SUMMARY_LIMIT)
+    lines = [
+        f"Earlier public hands: {len(groups)} recorded; last "
+        f"{min(len(groups), PRIOR_HAND_SUMMARY_LIMIT)} summarized; {omitted} older omitted."
+    ]
+    for group in groups[-PRIOR_HAND_SUMMARY_LIMIT:]:
+        hand_number = dict(group[0].detail).get("hand_number", "?")
+        award_kind = (
+            "score_awarded"
+            if any(event.kind == "score_awarded" for event in group)
+            else "lance_resolved"
+        )
+        awards = [
+            f"{detail.get('lance')}→team {detail.get('team')} +{detail.get('points')}"
+            for event in group
+            if event.kind == award_kind
+            for detail in (dict(event.detail),)
+        ]
+        bids = sum(event.kind == "bid" for event in group)
+        folds = sum(event.kind == "fold" for event in group)
+        lines.append(
+            f"  hand {int(hand_number) + 1}: bids={bids}, folds={folds}; "
+            f"awards={', '.join(awards) if awards else 'none'}"
+        )
+    return lines
+
+
+def _describe_action_v3(observation: Observation, action: Action) -> str:
+    kind = action.kind
+    v2 = observation.ruleset_id == FEDERATION_RULESET_ID
+    lance = observation.current_lance
+    intrinsic = lance is not None and lance.value in {"pares", "juego", "punto"}
+    if kind is ActionKind.MUS:
+        return "mus — vote to exchange cards if all four seats agree"
+    if kind is ActionKind.NO_MUS:
+        return "no mus — stop exchanges and begin grande now"
+    if kind is ActionKind.DISCARD:
+        indices = ", ".join(map(str, action.card_indices))
+        return f"discard indices {indices} — exchange these cards; indices refer to the current hand"
+    if kind is ActionKind.PASS:
+        return "pass — decline to open a bet; remain eligible to win this lance"
+    if kind in {ActionKind.BET, ActionKind.RAISE}:
+        refusal = observation.stake if kind is ActionKind.RAISE else 1
+        verb = "raise" if kind is ActionKind.RAISE else "bet"
+        return (
+            f"{verb} to {action.amount} total — next eligible opponent answers for "
+            f"their team; if they fold, your team receives {refusal} now"
+        )
+    if kind is ActionKind.CALL:
+        if v2 and observation.is_ordago:
+            return "call — accept órdago; best eligible hand wins the match now"
+        timing = "at showdown" if v2 else "now"
+        addition = (
+            "; winning team also gets intrinsic value" if v2 and intrinsic else ""
+        )
+        return f"call — accept {observation.stake} total; settle {timing}{addition}"
+    if kind is ActionKind.FOLD:
+        addition = (
+            "; it also gets intrinsic value at showdown if play continues"
+            if v2 and intrinsic
+            else ""
+        )
+        return (
+            f"fold — concede for your team; bidding team {observation.bidding_team} "
+            f"receives {observation.refusal_points} now{addition}"
+        )
+    if kind is ActionKind.ORDAGO:
+        refusal = observation.stake or 1
+        return (
+            "órdago — propose a match deciding showdown; opponent may call or fold; "
+            f"a fold gives your team {refusal} now"
+        )
+    if kind in {ActionKind.DECLARE_PARES, ActionKind.DECLARE_JUEGO}:
+        return f"{kind.value.replace('_', ' ')} — truthful eligibility declaration"
+    return f"{kind.value.replace('_', ' ')} — truthful ineligibility declaration"
+
+
+def _render_observation_v3(observation: Observation) -> str:
+    codec = ActionCodec(observation.target_score)
+    if len(observation.legal_action_mask) != codec.size:
+        raise ValueError("Observation mask does not match its target score")
+    partner = Seat((int(observation.seat) + 2) % 4)
+    order = tuple(Seat((int(observation.mano) + offset) % 4) for offset in range(4))
+    prior_events, current_events = _current_and_prior_events(observation)
+    lines = [
+        f"Ruleset: {observation.ruleset_id}; renderer: {RENDERER_VERSION}",
+        f"Hand: {observation.hand_number + 1}",
+        f"You: {observation.seat.name} (team {observation.team}); partner: {partner.name}",
+        f"Mano: {observation.mano.name}; tie priority: {' → '.join(seat.name for seat in order)}; mano_offset: {(observation.seat - observation.mano) % 4}",
+        f"Target: {observation.target_score} stones; scores: team 0={observation.scores[0]}, team 1={observation.scores[1]}",
+        "Scores include awards already paid; pending awards are excluded.",
+        f"Phase: {observation.phase.value}; active lance: {observation.current_lance.value if observation.current_lance else 'none'}",
+        f"Eligible seats for active lance: {', '.join(seat.name for seat in observation.lance_seats) if observation.lance_seats else 'not determined yet'}",
+        f"Current stake: {observation.stake}; bidding team: {observation.bidding_team}; fold awards: {observation.refusal_points}",
+    ]
+    if observation.stake:
+        lines.append(
+            f"Binding response: {observation.current_seat.name} acts for their whole team on this bid; their partner cannot veto."
+        )
+    else:
+        lines.append(
+            "No outstanding bid; an opening bet is answered by the next eligible opponent."
+        )
+    if observation.ruleset_id == FEDERATION_RULESET_ID:
+        lines.extend(
+            [
+                f"Outstanding ordago: {observation.is_ordago}",
+                "Accepted numeric bets and unbet awards settle at showdown in grande, chica, pares, juego/punto order. Called pares/juego/punto add intrinsic value. A called órdago decides the match and cancels pending awards.",
+                "Pending lances (winner not disclosed; settle in listed order):",
+            ]
+        )
+        lines.extend(
+            f"  {p.lance.value}: {p.reason}; accepted stake={p.stake}; eligible={','.join(seat.name for seat in p.eligible)}"
+            for p in observation.pending_lances
+        )
+        if not observation.pending_lances:
+            lines.append("  none")
+    else:
+        lines.append(
+            "Legacy scoring: each lance resolves immediately; called bets pay stake alone, folds pay refusal alone, and target-sized numeric bets equal órdago."
+        )
+    lines.append("Your cards (index: physical card; Mus rank; juego value):")
+    lines.extend(
+        f"  {index}: {int(card.rank)} of {card.suit.value}; rank={card.mus_rank}; value={card.juego_points}"
+        for index, card in enumerate(observation.private_hand)
+    )
+    lines.append(
+        "Your earlier discards this hand (seen cards, not necessarily out of play):"
+    )
+    lines.extend(
+        f"  exchange {index}: "
+        + ", ".join(f"{int(card.rank)} of {card.suit.value}" for card in cards)
+        for index, cards in enumerate(observation.own_discard_history, 1)
+    )
+    if not observation.own_discard_history:
+        lines.append("  none")
+    lines.append(
+        f"Discard counts this hand, cumulative (North, East, South, West): {observation.discard_counts}"
+    )
+    lines.extend(_prior_hand_summaries(prior_events))
+    lines.append("Current hand public history (complete):")
+    for event in current_events:
+        actor = event.actor.name if event.actor is not None else "table"
+        detail = ", ".join(f"{key}={value}" for key, value in event.detail)
+        lines.append(f"  {event.index}: {actor} {event.kind} {detail}".rstrip())
+    lines.append("Legal actions (ID: meaning):")
+    lines.extend(
+        f"  {action_id}: {_describe_action_v3(observation, codec.decode(action_id))}"
+        for action_id, allowed in enumerate(observation.legal_action_mask)
+        if allowed
+    )
+    return "\n".join(lines)
+
+
+def render_observation(
+    observation: Observation, *, renderer_version: int = RENDERER_VERSION
+) -> str:
+    """Render only this seat's observation with a pinned history policy."""
+    if renderer_version == 2:
+        return _render_observation_v2(observation)
+    if renderer_version == 3:
+        return _render_observation_v3(observation)
+    raise ValueError(f"Unknown renderer version: {renderer_version}")
+
+
 def render_messages(
     observation: Observation, *, prompt_version: int = PROMPT_VERSION
 ) -> list[dict[str, str]]:
@@ -108,7 +296,13 @@ def render_messages(
     role = f"You are {observation.seat.name}, team {observation.team}, mano_offset {offset}."
     return [
         {"role": "system", "content": f"{load_system_prompt(prompt_version)}\n{role}"},
-        {"role": "user", "content": render_observation(observation)},
+        {
+            "role": "user",
+            "content": render_observation(
+                observation,
+                renderer_version=renderer_version_for_prompt(prompt_version),
+            ),
+        },
     ]
 
 

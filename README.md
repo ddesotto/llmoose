@@ -340,19 +340,27 @@ even a 40-point match early. Use multiple seeded games for performance compariso
 
 Game instructions live in
 [`src/llmoose/agents/system_prompts/`](src/llmoose/agents/system_prompts/).
-`v1.txt` and `v2.txt` preserve the original instructions; **`v3.txt` is the default**
-and explains the new settlement contract and the legacy exception.
+`v1.txt` through `v3.txt` preserve the earlier instructions; **`v4.txt` is the
+default** and explains the player-facing context, private recall, and history policy.
 Every model uses the same selected instructions, followed by its seat/team role.
 Private cards, public history, and legal choices stay in the user message.
 
-Use `--prompt-version 1`, `2`, or `3` to select a version. Logs and reports record
-it and renderer version 2, and training renderers accept the same `prompt_version`.
+Use `--prompt-version 1`, `2`, `3`, or `4` to select a version. Logs and reports
+record the prompt and renderer versions. Prompts 1–3 retain renderer 2; prompt 4
+uses renderer 3. Training renderers accept the same `prompt_version`.
 Keep published versions unchanged: add a new `vN.txt` and register it in
 `agents/prompt.py` when changing instructions. All versions ship with the package.
 
-The renderer supplies the ruleset, outstanding órdago flag, and pending settlement
-terms. Private recall and context limits remain follow-ups in the
-[prompt review](docs/game-and-prompt.md); v3 does not implement those capabilities.
+Renderer 3 supplies the active lance, eligible seats, tie order, bidding team,
+refusal recipient, and contextual action effects. It remembers only the acting
+seat's discards during the current hand; those cards may return through recycling.
+The current hand's public events are complete. Up to three earlier public hands
+are summarized by bids, folds, and awards, with the number omitted stated in the
+input. Past-hand card reveals and detailed actions are omitted from that summary;
+scores retain all paid awards. No hand-strength summary is supplied, so evaluating
+the private cards remains the player's task. The current hand, private cards,
+rules, and legal menu are never truncated by the renderer; very long hands may
+exceed a provider's context window.
 
 Request settings are `--max-tokens` (1024), `--temperature` (0), and `--timeout`
 (60 seconds). If reasoning uses up the token budget before an answer, increase

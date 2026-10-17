@@ -23,14 +23,40 @@ from llmoose.simulation.runs import score_game
 from llmoose.simulation.terminal import TerminalSpectator
 from llmoose.simulation.traces import MatchTrace, load_trace, replay_trace
 
-# Grande: North; chica: West; pares: North (team value 2+1);
-# juego: only North/South qualify (3+3). West is mano throughout these fixtures.
-MIXED = ((12, 12, 12, 1), (10, 11, 6, 4), (10, 10, 11, 1), (7, 7, 7, 1))
-# Grande: North; chica: South; pares: North (2+2);
-# juego: West's 31 wins the tie by mano (team value 3+2).
-ALL_JUEGO = ((12, 12, 12, 1), (11, 11, 11, 4), (10, 10, 10, 1), (7, 7, 7, 12))
-# No pares or juego. Grande/chica: West/East; punto: North's 27.
-PUNTO = ((12, 7, 6, 4), (11, 7, 5, 1), (10, 7, 6, 1), (12, 11, 5, 1))
+MIXED = (
+    (12, 12, 12, 1),  # GRANDE, PARES (3), JUEGO (31)
+    (10, 11, 6, 4),  # ---
+    (10, 10, 11, 1),  # PARES (2), JUEGO (31)
+    (7, 7, 7, 1),  # CHICA
+)
+
+ALL_JUEGO = (
+    (12, 12, 12, 1),  # GRANDE, PARES (3), JUEGO (31)
+    (11, 11, 11, 4),  # PARES (3), JUEGO (34)
+    (10, 10, 10, 1),  # PARES (3), JUEGO (31)
+    (7, 7, 7, 12),  # PARES (3), JUEGO (40)
+)
+
+PUNTO = (
+    (12, 7, 6, 4),  # PUNTO (29)
+    (11, 7, 5, 1),  # CHICA, PUNTO (23)
+    (10, 7, 6, 1),  # PUNTO (24)
+    (12, 11, 5, 1),  # GRANDE, PUNTO (26)
+)
+
+ONE_TEAM_PARES = (
+    (12, 12, 1, 1),  # GRANDE, PARES (2,2)
+    (4, 5, 6, 7),  # PEDRETE
+    (11, 11, 10, 10),  # PARES (2,2), JUEGO (40)
+    (4, 5, 6, 7),  # PEDRETE
+)
+
+ONE_TEAM_JUEGO = (
+    (12, 11, 10, 1),  # GRANDE, JUEGO (31)
+    (4, 5, 6, 7),  # PEDRETE
+    (12, 11, 10, 1),  # GRANDE, JUEGO (31)
+    (4, 5, 6, 7),  # PEDRETE
+)
 
 
 def fixture_state(ranks=MIXED, *, scores=(0, 0), target=40):
@@ -68,6 +94,17 @@ def advance_to(state, lance):
     raise AssertionError(f"Did not reach {lance}")
 
 
+def advance_to_phase(state, phase):
+    policy = ConservativePolicy(ActionCodec(state.ruleset.target_score))
+    for _ in range(30):
+        if state.phase is phase:
+            return state
+        state = apply_action(
+            state, policy.act(observe(state, state.current_seat, policy.codec))
+        )
+    raise AssertionError(f"Did not reach {phase}")
+
+
 def finish_hand(state, hand=0):
     policy = ConservativePolicy(ActionCodec(state.ruleset.target_score))
     for _ in range(40):
@@ -98,6 +135,69 @@ def assert_accounting(state):
             )
             == state.scores[team]
         )
+
+
+@pytest.mark.parametrize(
+    "ranks,eligible,expected_stage",
+    [
+        (PUNTO, (), "skipped"),
+        (ONE_TEAM_PARES, (Seat.NORTH, Seat.SOUTH), "uncontested"),
+        (MIXED, (Seat.WEST, Seat.NORTH, Seat.SOUTH), "bidding"),
+    ],
+)
+def test_pares_eligibility_follows_truthful_declarations(
+    ranks, eligible, expected_stage
+):
+    state = advance_to_phase(fixture_state(ranks), Phase.DECLARE_PARES)
+    for _ in range(4):
+        state = apply_action(state, legal_actions(state, state.current_seat)[0])
+    assert state.declared_pares == eligible
+    if expected_stage == "skipped":
+        assert state.phase is Phase.DECLARE_JUEGO
+        assert not any(p.lance is Lance.PARES for p in state.pending_lances)
+    elif expected_stage == "uncontested":
+        pending = state.pending_lances[-1]
+        assert (pending.lance, pending.eligible, pending.reason) == (
+            Lance.PARES,
+            eligible,
+            "uncontested",
+        )
+    else:
+        assert state.current_lance is Lance.PARES
+        assert state.lance_seats == eligible
+
+
+@pytest.mark.parametrize(
+    "ranks,eligible,expected_stage",
+    [
+        (PUNTO, (), "punto"),
+        (ONE_TEAM_JUEGO, (Seat.NORTH, Seat.SOUTH), "uncontested"),
+        (ALL_JUEGO, tuple(Seat), "bidding"),
+    ],
+)
+def test_juego_eligibility_and_punto_fallback(ranks, eligible, expected_stage):
+    state = advance_to_phase(fixture_state(ranks), Phase.DECLARE_JUEGO)
+    declared = []
+    for _ in range(4):
+        action = legal_actions(state, state.current_seat)[0]
+        if action.kind is ActionKind.DECLARE_JUEGO:
+            declared.append(state.current_seat)
+        state = apply_action(state, action)
+    assert set(declared) == set(eligible)
+    if expected_stage == "punto":
+        assert state.current_lance is Lance.PUNTO
+        assert state.lance_seats == state.priority
+    elif expected_stage == "uncontested":
+        result = next(r for r in state.lance_results if r.lance is Lance.JUEGO)
+        assert (result.winning_team, result.points, result.reason) == (
+            0,
+            6,
+            "uncontested",
+        )
+        assert not any(r.lance is Lance.PUNTO for r in state.lance_results)
+    else:
+        assert state.current_lance is Lance.JUEGO
+        assert state.lance_seats == state.priority
 
 
 def test_called_target_sized_bet_waits_for_showdown_and_has_no_public_winner():

@@ -27,6 +27,7 @@ class Observation:
     scores: Tuple[int, int]
     current_lance: Optional[Lance]
     discard_counts: Tuple[int, int, int, int]
+    own_discard_history: Tuple[Tuple[Card, ...], ...]
     public_events: Tuple[Event, ...]
     legal_action_mask: Tuple[bool, ...]
     mano: Seat
@@ -35,6 +36,7 @@ class Observation:
     stake: int
     bidding_team: Optional[int]
     refusal_points: int
+    lance_seats: Tuple[Seat, ...]
     ruleset_id: str = LEGACY_RULESET_ID
     is_ordago: bool = False
     pending_lances: Tuple[PendingLance, ...] = ()
@@ -54,6 +56,7 @@ def observe(
         scores=state.scores,
         current_lance=state.current_lance,
         discard_counts=state.discard_counts,
+        own_discard_history=state.own_discard_history[int(seat)],
         public_events=state.events,
         legal_action_mask=codec.mask(legal_actions(state, seat)),
         mano=state.mano,
@@ -62,6 +65,7 @@ def observe(
         stake=state.stake,
         bidding_team=state.bidding_team,
         refusal_points=state.refusal_points,
+        lance_seats=state.lance_seats,
         ruleset_id=state.ruleset.id,
         is_ordago=state.is_ordago,
         pending_lances=state.pending_lances,

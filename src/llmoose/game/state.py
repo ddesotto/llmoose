@@ -129,6 +129,8 @@ class GameState:
     hand_number: int = 0
     discards: Tuple[Card, ...] = ()
     discard_counts: Tuple[int, int, int, int] = (0, 0, 0, 0)
+    # Private, per-seat record of cards exchanged during this hand.
+    own_discard_history: Tuple[Tuple[Tuple[Card, ...], ...], ...] = ((), (), (), ())
     mus_voters: Tuple[Seat, ...] = ()
     declared_pares: Tuple[Seat, ...] = ()
     declared_juego: Tuple[Seat, ...] = ()
