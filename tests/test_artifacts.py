@@ -50,7 +50,7 @@ def test_model_attempts_are_linked_even_on_provider_failure(tmp_path, monkeypatc
             return Completion("bad")
         raise ProviderError("offline test failure")
 
-    monkeypatch.setattr("llmoose.cli._build_provider", lambda _: provider)
+    monkeypatch.setattr("llmoose.cli._build_provider", lambda *_, **__: provider)
     with pytest.raises(SystemExit):
         play_command(["--policy", "llm", "--model", "test/model", "--run-dir", str(directory)])
     records, _ = read_journal(directory / "records.jsonl")
@@ -181,7 +181,7 @@ def test_resume_uses_saved_choice_or_explicit_fallback_without_reissuing_request
         )
         return Completion(f"<answer>{next(iter(choices))}</answer>")
 
-    monkeypatch.setattr("llmoose.cli._build_provider", lambda _: provider)
+    monkeypatch.setattr("llmoose.cli._build_provider", lambda *_, **__: provider)
     assert play_command([
         "--team-0", "llm", "--team-1", "conservative", "--model", "test/model",
         "--target-score", "2", "--run-dir", str(directory),
@@ -310,7 +310,7 @@ def test_provider_error_before_hard_kill_resumes_with_explicit_fallback(tmp_path
     def offline(_messages):
         raise ProviderError("offline")
 
-    monkeypatch.setattr("llmoose.cli._build_provider", lambda _: offline)
+    monkeypatch.setattr("llmoose.cli._build_provider", lambda *_, **__: offline)
     with pytest.raises(SystemExit):
         play_command([
             "--team-0", "llm", "--team-1", "conservative", "--model", "test/model",
@@ -325,7 +325,7 @@ def test_provider_error_before_hard_kill_resumes_with_explicit_fallback(tmp_path
         first = messages[1]["content"].split("Legal actions (ID: meaning):\n")[1].splitlines()[0]
         return Completion(f"<answer>{first.strip().split(': ', 1)[0]}</answer>")
 
-    monkeypatch.setattr("llmoose.cli._build_provider", lambda _: legal)
+    monkeypatch.setattr("llmoose.cli._build_provider", lambda *_, **__: legal)
     assert play_command(["--resume-run", str(directory)]) == 0
     records, _ = read_journal(directory / "records.jsonl")
     assert any(

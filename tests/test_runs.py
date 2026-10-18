@@ -58,7 +58,7 @@ def test_run_links_model_attempts_to_replay_and_scores(tmp_path, monkeypatch, ve
             )
         return legal_completion(messages)
 
-    monkeypatch.setattr("llmoose.cli._build_provider", lambda _: provider)
+    monkeypatch.setattr("llmoose.cli._build_provider", lambda *_, **__: provider)
     directory = tmp_path / "run"
     assert (
         play_command(
@@ -172,7 +172,7 @@ def test_failed_llm_run_keeps_attempt_and_partial_report(
             raise KeyboardInterrupt
         return Completion("bad")
 
-    monkeypatch.setattr("llmoose.cli._build_provider", lambda _: provider)
+    monkeypatch.setattr("llmoose.cli._build_provider", lambda *_, **__: provider)
     directory = tmp_path / "run"
     args = [
         "--policy",

@@ -211,9 +211,19 @@ def validate_run(directory: Path, *, allow_partial: bool = False) -> dict[str, o
             _require(payload["attempt_number"] == len(previous) + 1, "Attempt number gap")
             _require(payload["messages_sha256"] == digest(canonical_bytes(payload["messages"])), "Message hash mismatch")
             if payload["request_body"] is not None:
+                body = payload["request_body"]
+                expected_model = manifest["policies"][Seat(payload["seat"]).name]["requested_model"]
+                _require(body["model"] == expected_model, "Request model differs from assigned seat model")
+                legacy_order = (
+                    "model", "messages", "stream", "max_tokens", "temperature", "reasoning"
+                )
+                legacy_body = {key: body[key] for key in legacy_order if key in body}
                 _require(
                     payload["request_body_sha256"]
-                    == digest(json.dumps(payload["request_body"]).encode("utf-8")),
+                    in {
+                        digest(canonical_bytes(body)),
+                        digest(json.dumps(legacy_body).encode("utf-8")),
+                    },
                     "Request body hash mismatch",
                 )
                 _require(payload["request_body"]["messages"] == payload["messages"], "Request messages mismatch")

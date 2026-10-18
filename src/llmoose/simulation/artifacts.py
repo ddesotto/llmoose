@@ -176,7 +176,12 @@ def build_manifest(
                 "team": int(seat) % 2,
                 "kind": metadata["teams"][int(seat) % 2],
                 "requested_model": (
-                    metadata["requested_model"]
+                    metadata.get("requested_models", [metadata["requested_model"]] * 2)[int(seat) % 2]
+                    if metadata["teams"][int(seat) % 2] == "llm"
+                    else None
+                ),
+                "base_url": (
+                    metadata.get("base_urls", [metadata["base_url"]] * 2)[int(seat) % 2]
                     if metadata["teams"][int(seat) % 2] == "llm"
                     else None
                 ),

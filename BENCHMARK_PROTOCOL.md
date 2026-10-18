@@ -1,10 +1,12 @@
 # MooseBench: first runnable slice
 
 `llmoose-bench` currently measures one **candidate partnership** against one
-frozen scripted opponent (`conservative`, `heuristic`, or `random`). The candidate
-may also be an LLM served through the existing chat-completions transport. Each
-seed runs twice with the candidate on team 0 and team 1. All four seats get
-independent policy objects; LLM seats currently share one provider configuration.
+frozen opponent. Either side may be `conservative`, `heuristic`, `random`, or an
+LLM served through the existing chat-completions transport. Two LLM sides may
+use different model IDs and API endpoints. Each seed runs twice with the
+candidate on team 0 and team 1. All four seats get independent policy objects
+and every LLM seat gets its own provider instance. Prompt, temperature, token
+limit, and strict/assisted mode are shared within a suite.
 
 The run directory contains `benchmark.json`, `summary.json`, and a validated v2
 run for each seed and assignment. Rerunning the same command reuses completed
@@ -21,8 +23,8 @@ reported from the candidate's perspective. Small smoke suites and intervals are
 plumbing checks, not reliable model rankings. Hosted model output may vary even
 when the environment setup is identical.
 
-The first release intentionally omits model-versus-model pairing, dealer
-rotations, request/cost caps, batch concurrency, and a held-out benchmark suite.
+The first release intentionally omits dealer rotations, request/cost caps,
+batch concurrency, and a held-out benchmark suite.
 It also does not claim that the current heuristic is strong Mus play. These are
 the next TASK-11/06/12 steps before a public model comparison.
 

@@ -25,6 +25,7 @@ from llmoose.simulation.validation import recover_run, validate_run
 SCHEMA = "llmoose.benchmark"
 SCHEMA_VERSION = 1
 _MISSING = object()
+_EXAMPLE_MODEL_IDS = {"MODEL", "OTHER_MODEL", "CANDIDATE_MODEL", "OPPONENT_MODEL"}
 
 
 @contextmanager
@@ -76,15 +77,19 @@ def _manifest(args: argparse.Namespace) -> dict[str, Any]:
         "target_score": args.target_score,
         "max_steps": args.max_steps,
         "candidate": {"kind": args.candidate, "model": args.model if args.candidate == "llm" else None},
-        "opponent": {"kind": args.opponent},
+        "opponent": {
+            "kind": args.opponent,
+            "model": args.opponent_model if args.opponent == "llm" else None,
+        },
         "model_settings": {
             "base_url": args.base_url if args.candidate == "llm" else None,
-            "prompt_version": args.prompt_version if args.candidate == "llm" else None,
-            "temperature": args.temperature if args.candidate == "llm" else None,
-            "max_tokens": args.max_tokens if args.candidate == "llm" else None,
-            "timeout": args.timeout if args.candidate == "llm" else None,
-            "strict": not args.assisted if args.candidate == "llm" else None,
+            "prompt_version": args.prompt_version if "llm" in (args.candidate, args.opponent) else None,
+            "temperature": args.temperature if "llm" in (args.candidate, args.opponent) else None,
+            "max_tokens": args.max_tokens if "llm" in (args.candidate, args.opponent) else None,
+            "timeout": args.timeout if "llm" in (args.candidate, args.opponent) else None,
+            "strict": not args.assisted if "llm" in (args.candidate, args.opponent) else None,
         },
+        "opponent_base_url": args.opponent_base_url if args.opponent == "llm" else None,
         "pairing": "candidate plays team 0 and team 1 for every seed",
         "initial_dealer": "NORTH",
         "primary_metric": "candidate win fraction over complete seed pairs",
@@ -106,17 +111,27 @@ def _play_args(args: argparse.Namespace, seed: int, team: int, path: Path) -> li
         "--team-0", names[0], "--team-1", names[1],
         "--run-dir", str(path),
     ]
-    if args.candidate == "llm":
+    if "llm" in (args.candidate, args.opponent):
         command += [
-            "--model", args.model, "--base-url", args.base_url,
             "--prompt-version", str(args.prompt_version),
             "--temperature", str(args.temperature),
             "--max-tokens", str(args.max_tokens), "--timeout", str(args.timeout),
         ]
         if not args.assisted:
             command.append("--llm-strict")
-        if args.api_key_env:
-            command += ["--api-key-env", args.api_key_env]
+        for assigned_team, kind in enumerate(names):
+            if kind != "llm":
+                continue
+            candidate_side = assigned_team == team
+            command += [
+                f"--team-{assigned_team}-model",
+                args.model if candidate_side else args.opponent_model,
+                f"--team-{assigned_team}-base-url",
+                args.base_url if candidate_side else args.opponent_base_url,
+            ]
+            key_env = args.api_key_env if candidate_side else args.opponent_api_key_env
+            if key_env:
+                command += [f"--team-{assigned_team}-api-key-env", key_env]
     return command
 
 
@@ -135,8 +150,11 @@ def _job_result(args: argparse.Namespace, seed: int, team: int, output: Path) ->
                 recover_run(path)
             elif verdict["status"] == "partial":
                 resume = ["--resume-run", str(path)]
-                if args.api_key_env:
-                    resume += ["--api-key-env", args.api_key_env]
+                for assigned_team in (0, 1):
+                    candidate_side = assigned_team == team
+                    key_env = args.api_key_env if candidate_side else args.opponent_api_key_env
+                    if key_env and (args.candidate if candidate_side else args.opponent) == "llm":
+                        resume += [f"--team-{assigned_team}-api-key-env", key_env]
                 _play(resume)
         else:
             _play(_play_args(args, seed, team, path))
@@ -232,7 +250,7 @@ def benchmark_command(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--suite-id", required=True)
     parser.add_argument("--seeds", required=True, type=_seeds)
     parser.add_argument("--candidate", required=True, choices=POLICY_NAMES)
-    parser.add_argument("--opponent", required=True, choices=POLICY_NAMES[:-1])
+    parser.add_argument("--opponent", required=True, choices=POLICY_NAMES)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--ruleset", choices=RULESET_IDS, default=FEDERATION_RULESET_ID)
     parser.add_argument("--target-score", type=int, default=40)
@@ -240,6 +258,9 @@ def benchmark_command(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--model")
     parser.add_argument("--base-url", default=OPENROUTER_BASE_URL)
     parser.add_argument("--api-key-env")
+    parser.add_argument("--opponent-model")
+    parser.add_argument("--opponent-base-url", default=OPENROUTER_BASE_URL)
+    parser.add_argument("--opponent-api-key-env")
     parser.add_argument("--prompt-version", type=int, choices=PROMPT_VERSIONS, default=PROMPT_VERSION)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max-tokens", type=int, default=1024)
@@ -250,24 +271,38 @@ def benchmark_command(argv: Sequence[str] | None = None) -> int:
         parser.error("Provide a nonempty suite ID, target score >= 2, and positive max steps")
     if args.candidate == "llm" and not args.model:
         parser.error("--model is required for an LLM candidate")
-    if args.assisted and args.candidate != "llm":
-        parser.error("--assisted requires an LLM candidate")
-    if args.candidate == "llm":
+    if args.opponent == "llm" and not args.opponent_model:
+        parser.error("--opponent-model is required for an LLM opponent")
+    for option, kind, model in (
+        ("--model", args.candidate, args.model),
+        ("--opponent-model", args.opponent, args.opponent_model),
+    ):
+        if kind == "llm" and model in _EXAMPLE_MODEL_IDS:
+            parser.error(f"{option}={model} is an example placeholder; use a real provider model ID")
+    if args.assisted and "llm" not in (args.candidate, args.opponent):
+        parser.error("--assisted requires an LLM policy")
+    if "llm" in (args.candidate, args.opponent):
         load_dotenv(Path.cwd() / ".env", override=False)
-        key_env = args.api_key_env
-        if key_env is None and args.base_url.rstrip("/") == OPENROUTER_BASE_URL:
-            key_env = "OPENROUTER_API_KEY"
         try:
-            if key_env and not os.environ.get(key_env):
-                raise ValueError(f"Set {key_env} before running an LLM candidate")
-            ChatCompletionProvider(
-                model=args.model,
-                api_key=os.environ.get(key_env, "") if key_env else "",
-                base_url=args.base_url,
-                timeout=args.timeout,
-                max_tokens=args.max_tokens,
-                temperature=args.temperature,
-            )
+            for kind, model, base_url, requested_key_env in (
+                (args.candidate, args.model, args.base_url, args.api_key_env),
+                (args.opponent, args.opponent_model, args.opponent_base_url, args.opponent_api_key_env),
+            ):
+                if kind != "llm":
+                    continue
+                key_env = requested_key_env
+                if key_env is None and base_url.rstrip("/") == OPENROUTER_BASE_URL:
+                    key_env = "OPENROUTER_API_KEY"
+                if key_env and not os.environ.get(key_env):
+                    raise ValueError(f"Set {key_env} before running an LLM policy")
+                ChatCompletionProvider(
+                    model=model,
+                    api_key=os.environ.get(key_env, "") if key_env else "",
+                    base_url=base_url,
+                    timeout=args.timeout,
+                    max_tokens=args.max_tokens,
+                    temperature=args.temperature,
+                )
         except ValueError as exc:
             parser.error(str(exc))
     manifest = _manifest(args)

@@ -49,3 +49,20 @@ def test_individual_seat_can_use_a_model_without_cli_or_environment_variables():
 def test_model_policy_requires_an_explicit_provider():
     with pytest.raises(ValueError, match="require a provider"):
         build_policies({seat: "llm" for seat in SEATS}, ActionCodec(), seed=0)
+
+
+def test_model_seats_can_have_distinct_providers():
+    providers = {
+        seat: (lambda messages, seat=seat: Completion("<answer>1</answer>", model=seat.name))
+        for seat in SEATS
+    }
+    policies = build_policies(
+        {seat: "llm" for seat in SEATS}, ActionCodec(),
+        seed=0, provider=providers,
+    )
+    assert all(policies[seat].provider is providers[seat] for seat in SEATS)
+    with pytest.raises(ValueError, match="Every LLM seat"):
+        build_policies(
+            {seat: "llm" for seat in SEATS}, ActionCodec(),
+            seed=0, provider={Seat.NORTH: providers[Seat.NORTH]},
+        )

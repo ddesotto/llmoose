@@ -19,14 +19,14 @@ def build_policies(
     codec: ActionCodec,
     *,
     seed: int,
-    provider: LLMProvider | None = None,
+    provider: LLMProvider | Mapping[Seat, LLMProvider] | None = None,
     strict: bool = False,
     on_record: DecisionLogger | None = None,
     prompt_version: int = PROMPT_VERSION,
 ) -> dict[Seat, Policy]:
     """Create one independent policy per seat.
 
-    The can optionally share a provider.
+    A provider mapping gives each model seat its own transport.
     """
     if set(names) != set(SEATS):
         raise ValueError("Provide one policy name for every seat")
@@ -34,14 +34,19 @@ def build_policies(
         raise ValueError(f"Policy names must be one of {POLICY_NAMES}")
     if "llm" in names.values() and provider is None:
         raise ValueError("LLM policies require a provider")
+    if isinstance(provider, Mapping) and any(
+        seat not in provider for seat in SEATS if names[seat] == "llm"
+    ):
+        raise ValueError("Every LLM seat requires a provider")
 
     policies: dict[Seat, Policy] = {}
     for seat in SEATS:
         name = names[seat]
         if name == "llm":
+            seat_provider = provider[seat] if isinstance(provider, Mapping) else provider
             policies[seat] = StructuredLLMPolicy(
                 codec,
-                provider,
+                seat_provider,
                 max_retries=0 if strict else 2,
                 fallback_on_invalid=not strict,
                 on_record=on_record,

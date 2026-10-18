@@ -202,7 +202,7 @@ class RunRecorder:
                 "messages_sha256": digest(canonical_bytes(messages)),
                 "request_body": request_body,
                 "request_body_sha256": (
-                    digest(json.dumps(request_body).encode("utf-8"))
+                    digest(canonical_bytes(request_body))
                     if request_body is not None
                     else None
                 ),
@@ -210,8 +210,16 @@ class RunRecorder:
                     None if request_body is not None else "custom provider interface"
                 ),
                 "request_settings": {
-                    key: self.metadata[key]
-                    for key in ("requested_model", "temperature", "max_tokens", "timeout", "include_reasoning")
+                    "requested_model": self.metadata.get(
+                        "requested_models", [self.metadata["requested_model"]] * 2
+                    )[int(observation.seat) % 2],
+                    "base_url": self.metadata.get(
+                        "base_urls", [self.metadata["base_url"]] * 2
+                    )[int(observation.seat) % 2],
+                    **{
+                        key: self.metadata[key]
+                        for key in ("temperature", "max_tokens", "timeout", "include_reasoning")
+                    },
                 },
             },
             decision_id=self._current_decision_id,

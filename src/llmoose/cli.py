@@ -49,7 +49,10 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
     if args.resume_run:
         supplied = list(argv) if argv is not None else sys.argv[1:]
-        allowed = {"--resume-run", "--watch", "--step", "--delay", "--api-key-env"}
+        allowed = {
+            "--resume-run", "--watch", "--step", "--delay", "--api-key-env",
+            "--team-0-api-key-env", "--team-1-api-key-env",
+        }
         unexpected = [
             token.split("=", 1)[0]
             for token in supplied
@@ -84,12 +87,38 @@ def _play_with_options(parser: argparse.ArgumentParser, args: argparse.Namespace
         args.team_0, args.team_1 = intent["teams"]
         args.model = intent["requested_model"]
         args.base_url = intent["base_url"] or OPENROUTER_BASE_URL
+        models = intent.get(
+            "requested_models",
+            [args.model if kind == "llm" else None for kind in intent["teams"]],
+        )
+        urls = intent.get(
+            "base_urls",
+            [args.base_url if kind == "llm" else None for kind in intent["teams"]],
+        )
+        args.team_0_model, args.team_1_model = models
+        args.team_0_base_url, args.team_1_base_url = urls
         args.llm_strict = intent["strict"]
         args.reasoning = intent["include_reasoning"]
     teams = (args.team_0 or args.policy, args.team_1 or args.policy)
     try:
         _validate_options(args, teams)
-        provider = _build_provider(args) if "llm" in teams else None
+        models = tuple(
+            (getattr(args, f"team_{team}_model") or args.model) if teams[team] == "llm" else None
+            for team in (0, 1)
+        )
+        urls = tuple(
+            (getattr(args, f"team_{team}_base_url") or args.base_url) if teams[team] == "llm" else None
+            for team in (0, 1)
+        )
+        providers = {
+            seat: _build_provider(
+                args,
+                model=models[team_for(seat)],
+                base_url=urls[team_for(seat)],
+                key_env=getattr(args, f"team_{team_for(seat)}_api_key_env") or args.api_key_env,
+            )
+            for seat in SEATS if teams[team_for(seat)] == "llm"
+        }
     except ValueError as exc:
         parser.error(str(exc))
 
@@ -104,11 +133,11 @@ def _play_with_options(parser: argparse.ArgumentParser, args: argparse.Namespace
         except OSError as exc:
             parser.error(f"Cannot create a new run directory: {exc}")
         args.trace = str(directory / "match.json")
-        if provider is not None:
+        if providers:
             args.llm_log = str(directory / "decisions.jsonl")
     elif prefix is not None:
         args.trace = str(directory / "match.json")
-        if provider is not None:
+        if providers:
             args.llm_log = str(directory / "decisions.jsonl")
         trim_torn_journal(directory, prefix)
         reconcile_move_log(directory, prefix)
@@ -118,8 +147,12 @@ def _play_with_options(parser: argparse.ArgumentParser, args: argparse.Namespace
         "target_score": args.target_score,
         "ruleset": asdict(ruleset),
         "teams": list(teams),
-        "requested_model": args.model,
-        "base_url": args.base_url if provider is not None else None,
+        "requested_model": next(iter(set(model for model in models if model)), None)
+        if len({model for model in models if model}) <= 1 else None,
+        "requested_models": list(models),
+        "base_url": next(iter(set(url for url in urls if url)), None)
+        if len({url for url in urls if url}) <= 1 else None,
+        "base_urls": list(urls),
         "prompt_version": args.prompt_version,
         "renderer_version": renderer_version_for_prompt(args.prompt_version),
         "temperature": args.temperature,
@@ -151,7 +184,7 @@ def _play_with_options(parser: argparse.ArgumentParser, args: argparse.Namespace
         {seat: teams[team_for(seat)] for seat in SEATS},
         ActionCodec(ruleset.target_score),
         seed=args.seed,
-        provider=provider,
+        provider=providers or None,
         strict=args.llm_strict,
         on_record=reporter,
         prompt_version=args.prompt_version,
@@ -201,7 +234,7 @@ def _play_with_options(parser: argparse.ArgumentParser, args: argparse.Namespace
                 if policy.act(observe(state, actor, codec)) != action:
                     parser.error("Random policy sequence differs from recorded run")
             state = apply_action(state, action)
-    spectator = _build_spectator(args, teams, provider is not None)
+    spectator = _build_spectator(args, teams, models)
     recorder = (
         RunRecorder(
             directory,
@@ -307,9 +340,13 @@ def _play_with_options(parser: argparse.ArgumentParser, args: argparse.Namespace
                     "team_0": teams[0],
                     "team_1": teams[1],
                 }
-                if provider is not None:
+                if providers:
+                    if metadata["requested_model"] is not None:
+                        trace_metadata["model"] = metadata["requested_model"]
+                    for team, model in enumerate(models):
+                        if model is not None:
+                            trace_metadata[f"team_{team}_model"] = model
                     trace_metadata.update(
-                        model=args.model,
                         llm_strict=str(args.llm_strict),
                         prompt_version=str(args.prompt_version),
                         renderer_version=str(
@@ -387,6 +424,19 @@ def _build_parser() -> argparse.ArgumentParser:
         default=os.environ.get("OPENROUTER_MODEL"),
         help="Model ID (or OPENROUTER_MODEL)",
     )
+    for team in (0, 1):
+        llm_options.add_argument(
+            f"--team-{team}-model",
+            help=f"Model ID for LLM seats on team {team}; overrides --model",
+        )
+        llm_options.add_argument(
+            f"--team-{team}-base-url",
+            help=f"API base URL for LLM seats on team {team}; overrides --base-url",
+        )
+        llm_options.add_argument(
+            f"--team-{team}-api-key-env",
+            help=f"API key environment variable for team {team}",
+        )
     llm_options.add_argument(
         "--prompt-version",
         type=int,
@@ -433,11 +483,18 @@ def _validate_options(args: argparse.Namespace, teams: tuple[str, str]) -> None:
         raise ValueError("--max-steps must be positive")
     if args.delay is not None and (not math.isfinite(args.delay) or args.delay < 0):
         raise ValueError("--delay must be a finite, non-negative number")
+    for team, kind in enumerate(teams):
+        if kind != "llm" and any(
+            getattr(args, f"team_{team}_{setting}") is not None
+            for setting in ("model", "base_url", "api_key_env")
+        ):
+            raise ValueError(f"Team {team} model settings require --team-{team} llm")
     if "llm" in teams:
-        if not args.model:
-            raise ValueError(
-                "--model or OPENROUTER_MODEL is required for an LLM player"
-            )
+        for team, kind in enumerate(teams):
+            if kind == "llm" and not (getattr(args, f"team_{team}_model") or args.model):
+                raise ValueError(
+                    f"--team-{team}-model, --model, or OPENROUTER_MODEL is required for an LLM player on team {team}"
+                )
     elif args.llm_log or args.llm_strict or args.reasoning:
         raise ValueError(
             "--llm-log, --llm-strict, and --reasoning require an llm policy"
@@ -450,18 +507,23 @@ def _validate_options(args: argparse.Namespace, teams: tuple[str, str]) -> None:
         raise ValueError("--llm-log and --trace must use different files")
 
 
-def _build_provider(args: argparse.Namespace) -> ChatCompletionProvider:
+def _build_provider(
+    args: argparse.Namespace,
+    *,
+    model: str,
+    base_url: str,
+    key_env: str | None,
+) -> ChatCompletionProvider:
     """Resolve CLI configuration and credentials at the application boundary."""
-    key_env = args.api_key_env
-    if key_env is None and args.base_url.rstrip("/") == OPENROUTER_BASE_URL:
+    if key_env is None and base_url.rstrip("/") == OPENROUTER_BASE_URL:
         key_env = "OPENROUTER_API_KEY"
     api_key = os.environ.get(key_env, "") if key_env else ""
     if key_env and not api_key:
         raise ValueError(f"Set {key_env} before running an LLM player")
     return ChatCompletionProvider(
-        model=args.model,
+        model=model,
         api_key=api_key,
-        base_url=args.base_url,
+        base_url=base_url,
         timeout=args.timeout,
         max_tokens=args.max_tokens,
         temperature=args.temperature,
@@ -472,7 +534,7 @@ def _build_provider(args: argparse.Namespace) -> ChatCompletionProvider:
 def _build_spectator(
     args: argparse.Namespace,
     teams: tuple[str, str],
-    has_model: bool,
+    models: tuple[str | None, str | None],
 ) -> TerminalSpectator | None:
     if not (args.watch or args.step or args.delay is not None):
         return None
@@ -482,8 +544,13 @@ def _build_spectator(
         flush=True,
     )
     print("Spectator view: all four hands are visible.", flush=True)
-    if has_model:
-        print(f"LLM model: {args.model}", flush=True)
+    distinct_models = {model for model in models if model}
+    if len(distinct_models) == 1:
+        print(f"LLM model: {next(iter(distinct_models))}", flush=True)
+    elif distinct_models:
+        for team, model in enumerate(models):
+            if model:
+                print(f"Team {team} model: {model}", flush=True)
     return TerminalSpectator(
         delay=0.4 if args.delay is None else args.delay,
         step=args.step,

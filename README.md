@@ -347,11 +347,16 @@ uv run --frozen llmoose-bench --suite-id local-smoke-v1 --seeds 12,13 \
   --output runs/bench-local-smoke-v1
 ```
 
-An LLM candidate can use `--candidate llm --model MODEL`; the default is strict
-inference, while `--assisted` enables retries and conservative fallback. The
-opponent is currently scripted. The primary win rate uses only complete mirrored
-seed pairs; incomplete games remain in coverage and job rows. A two-seed smoke
-result is not a model ranking. The [benchmark protocol](BENCHMARK_PROTOCOL.md)
+An LLM candidate uses `--candidate llm --model MODEL`; an LLM opponent uses
+`--opponent llm --opponent-model OTHER_MODEL`. Each team gets separate model
+providers, and `--base-url` / `--opponent-base-url` can point to different
+endpoints. Replace `MODEL` and `OTHER_MODEL` with actual IDs from your provider's
+catalog before running; these names are placeholders. If either model changes,
+choose a new suite ID and output directory because the manifest pins both IDs.
+The default is strict inference; `--assisted` enables retries and
+conservative fallback for both sides. The primary win rate uses only complete
+mirrored seed pairs; incomplete games remain in coverage and job rows. A
+two-seed smoke result is not a model ranking. The [benchmark protocol](BENCHMARK_PROTOCOL.md)
 records the current scope and next gates.
 
 ## Inspect and replay games
