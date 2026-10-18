@@ -30,6 +30,7 @@ dev = ["pytest>=8", "ruff>=0.6"]
 llmoose-play = "llmoose.cli:play_command"
 llmoose-inspect = "llmoose.simulation.inspect:inspect_command"
 llmoose-validate = "llmoose.simulation.validation:validate_command"
+llmoose-bench = "llmoose.benchmark.runner:benchmark_command"
 
 [tool.setuptools.packages.find]
 where = ["src"]

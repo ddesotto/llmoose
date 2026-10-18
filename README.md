@@ -332,6 +332,28 @@ uv run --frozen llmoose-play --seed 12 --target-score 8 \
   --team-0 heuristic --team-1 conservative --run-dir runs/baseline-seed-12
 ```
 
+## First mirrored benchmark
+
+`llmoose-bench` runs each seed twice, swapping the candidate and frozen scripted
+opponent between partnerships. It saves a v2 run for every game and a suite
+manifest plus `summary.json` in the output directory. Repeating the same command
+reuses validated completed games and resumes partial ones when the saved manifest,
+including its source hash, matches. Choose a new output name after code or
+settings change; the old results stay available in their existing directory.
+
+```bash
+uv run --frozen llmoose-bench --suite-id local-smoke-v1 --seeds 12,13 \
+  --candidate heuristic --opponent conservative --target-score 8 \
+  --output runs/bench-local-smoke-v1
+```
+
+An LLM candidate can use `--candidate llm --model MODEL`; the default is strict
+inference, while `--assisted` enables retries and conservative fallback. The
+opponent is currently scripted. The primary win rate uses only complete mirrored
+seed pairs; incomplete games remain in coverage and job rows. A two-seed smoke
+result is not a model ranking. The [benchmark protocol](BENCHMARK_PROTOCOL.md)
+records the current scope and next gates.
+
 ## Inspect and replay games
 
 ```bash

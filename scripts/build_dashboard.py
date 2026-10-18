@@ -1,6 +1,6 @@
 """Build a portable, offline HTML dashboard from the repository's learning artifacts.
 
-Run `.venv/bin/python scripts/build_dashboard.py` after changing TODO or guides.
+Run `uv run --frozen python scripts/build_dashboard.py` after changing TODO or guides.
 No dependencies or network access are required. Browser progress is independent
 of source checkboxes and uses stable text-derived IDs across rebuilds.
 """
@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 GUIDES = {
     "overview": ("Learning path", "README.md"),
-    "game": ("Game & prompt audit", "game-and-prompt.md"),
+    "game": ("Game & prompt history", "game-and-prompt.md"),
     "artifacts": ("Traces & artifacts", "artifacts.md"),
     "benchmark": ("Build MooseBench", "benchmark.md"),
     "training": ("Train a small model", "training.md"),
@@ -27,42 +27,42 @@ STAGES = [
     (
         "rules",
         "01",
-        "Understand the game",
-        "Correct rules and clear player inputs.",
+        "Rules & player input",
+        "Validated rules and a self-contained player view.",
         ["09", "10"],
     ),
     (
         "records",
         "02",
-        "Preserve the evidence",
-        "Capture decisions you can trust and reuse.",
+        "Durable runs",
+        "Versioned evidence, replay, and crash recovery.",
         ["18"],
     ),
     (
         "benchmark",
         "03",
-        "Compare models",
-        "Paired games, honest metrics, durable runs.",
+        "Benchmark models",
+        "Frozen suites, mirrored games, honest metrics.",
         ["11", "06", "12"],
     ),
     (
         "teach",
         "04",
-        "Teach a small model",
+        "Train a small model",
         "Knowledge, demonstrations, and fine-tuning.",
         ["13", "14", "04", "05"],
     ),
     (
         "rl",
         "05",
-        "Learn through play",
+        "Improve through play",
         "Verified rollouts, rewards, and updates.",
         ["15", "07", "08"],
     ),
     (
         "release",
         "06",
-        "Expand & reproduce",
+        "Share & reproduce",
         "Cross-play, humans, and reusable releases.",
         ["16", "17"],
     ),
@@ -284,7 +284,9 @@ def main():
         ],
     }
     template = (DOCS / "dashboard/template.html").read_text()
-    css = (DOCS / "dashboard/style.css").read_text()
+    css = (DOCS / "dashboard/style.css").read_text() + "\n" + (
+        DOCS / "dashboard/refinement.css"
+    ).read_text()
     js = (DOCS / "dashboard/app.js").read_text()
     encoded = (
         json.dumps(data, ensure_ascii=False)

@@ -20,12 +20,15 @@ browser-local progress and notes. Its checkmarks do not modify this source.
 - [x] LLM transport and policy, versioned prompts, forced-action bypass, exact
       conversation logs, incremental moves, reports, and inspection.
 - [x] Basic Python benchmark function with seed suites and team outcomes.
+- [x] First mirrored fixed-opponent `llmoose-bench` runner with candidate-relative
+      results, complete-pair coverage, seed-cluster bootstrap, and per-game v2 runs.
+      This is a smoke/development slice, not the full TASK-11/06/12 protocol.
 - [x] Optional training dependencies declared; GPU installation/training unverified.
 - [x] Repository review and learning artifacts added on 2026-10-14. See the
       [prompt/game audit](docs/game-and-prompt.md) and [evidence snapshot](docs/evidence/review-2026-10-14.json).
 - [x] Offline HTML workspace with roadmap filters/checklists, guide reading notes,
       evidence inspection, a synthetic trace explorer, and progress export/import.
-      Regenerate with `.venv/bin/python scripts/build_dashboard.py` after source edits.
+      Regenerate with `uv run --frozen python scripts/build_dashboard.py` after source edits.
 
 The medias ranking bug found in the audit was fixed in `1c5baf2`. The default v2
 ruleset now implements federation-based deferred scoring and distinct órdago
@@ -162,6 +165,7 @@ Further hardening:
 
 **Depends on:** TASK-09, TASK-10, TASK-18 core recording gate.
 **Guide:** [benchmark tutorial](docs/benchmark.md).
+**Runnable slice:** [first benchmark protocol](BENCHMARK_PROTOCOL.md).
 
 - [ ] Define the main track: two private instances of the candidate model form a
       partnership against frozen opponents. Keep unfamiliar-partner evaluation separate.
