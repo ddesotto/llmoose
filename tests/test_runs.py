@@ -3,7 +3,11 @@ from dataclasses import replace
 
 import pytest
 
-from llmoose.agents.prompt import load_system_prompt, render_messages
+from llmoose.agents.prompt import (
+    load_system_prompt,
+    render_messages,
+    renderer_version_for_prompt,
+)
 from llmoose.agents.providers import Completion, ProviderError
 from llmoose.cli import play_command
 from llmoose.game.actions import ActionCodec
@@ -39,13 +43,14 @@ def legal_completion(messages):
         next(iter(choices)),
     )
     return Completion(
-        f"<answer>{chosen}</answer>",
+        (json.dumps({"action_id": int(chosen)}) if '"action_id"' in messages[0]["content"]
+         else f"<answer>{chosen}</answer>"),
         model="resolved/test",
         usage={"prompt_tokens": 100, "completion_tokens": 8, "cost": 0.001},
     )
 
 
-@pytest.mark.parametrize("version", [1, 2, 3, 4])
+@pytest.mark.parametrize("version", [1, 2, 3, 4, 5])
 def test_run_links_model_attempts_to_replay_and_scores(tmp_path, monkeypatch, version):
     requests = []
 
@@ -87,8 +92,8 @@ def test_run_links_model_attempts_to_replay_and_scores(tmp_path, monkeypatch, ve
     assert validate_run(directory)["status"] == "finalized"
     assert report["status"] == "completed"
     assert report["prompt_version"] == version
-    assert report["renderer_version"] == (2 if version <= 3 else 3)
-    assert trace.metadata["renderer_version"] == str(2 if version <= 3 else 3)
+    assert report["renderer_version"] == renderer_version_for_prompt(version)
+    assert trace.metadata["renderer_version"] == str(renderer_version_for_prompt(version))
     assert report["game"] == score_game(final, len(moves))
     assert report["game"]["actions"] == len(trace.actions)
     assert report["run_id"] == trace.metadata["run_id"]
@@ -107,7 +112,7 @@ def test_run_links_model_attempts_to_replay_and_scores(tmp_path, monkeypatch, ve
         assert record["seat"] == move["seat"]
         assert record["run_id"] == move["run_id"] == report["run_id"]
         assert record["prompt_version"] == version
-        assert record["renderer_version"] == (2 if version <= 3 else 3)
+        assert record["renderer_version"] == renderer_version_for_prompt(version)
         assert record["ruleset_id"] == trace.ruleset.id
         assert record["messages"][0]["content"].startswith(load_system_prompt(version))
         if record["status"] in ("chosen", "forced"):

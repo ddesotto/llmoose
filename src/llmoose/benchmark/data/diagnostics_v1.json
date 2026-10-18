@@ -1,0 +1,1654 @@
+{
+  "suite_id": "mus-diagnostics-development-v1",
+  "schema_version": 1,
+  "label_origin": "Authored from the repository rules contract; independently checked against engine behavior, not generated from engine predictions.",
+  "cases": [
+    {
+      "id": "probe-001",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "grande",
+        "left": [
+          12,
+          12,
+          4,
+          1
+        ],
+        "right": [
+          12,
+          11,
+          11,
+          7
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "left",
+      "explanation": "The second king beats the second knight."
+    },
+    {
+      "id": "probe-002",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "grande",
+        "left": [
+          3,
+          10,
+          7,
+          1
+        ],
+        "right": [
+          12,
+          10,
+          7,
+          2
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "tie",
+      "explanation": "Physical threes and twos normalize to kings and aces."
+    },
+    {
+      "id": "probe-003",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "chica",
+        "left": [
+          1,
+          4,
+          10,
+          12
+        ],
+        "right": [
+          2,
+          5,
+          6,
+          7
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "left",
+      "explanation": "After tied aces, four is lower than five."
+    },
+    {
+      "id": "probe-004",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "chica",
+        "left": [
+          1,
+          4,
+          6,
+          7
+        ],
+        "right": [
+          2,
+          4,
+          6,
+          7
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "tie",
+      "explanation": "Equivalent aces; all compared ranks tie."
+    },
+    {
+      "id": "probe-005",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "pares",
+        "left": [
+          4,
+          4,
+          7,
+          7
+        ],
+        "right": [
+          12,
+          12,
+          12,
+          1
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "left",
+      "explanation": "Duples beat medias."
+    },
+    {
+      "id": "probe-006",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "pares",
+        "left": [
+          4,
+          4,
+          4,
+          12
+        ],
+        "right": [
+          7,
+          7,
+          6,
+          5
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "left",
+      "explanation": "Medias beat one pair regardless of pair rank."
+    },
+    {
+      "id": "probe-007",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "pares",
+        "left": [
+          4,
+          4,
+          4,
+          12
+        ],
+        "right": [
+          7,
+          7,
+          7,
+          1
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "right",
+      "explanation": "Triple sevens beat triple fours; singleton king is irrelevant."
+    },
+    {
+      "id": "probe-008",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "pares",
+        "left": [
+          3,
+          3,
+          3,
+          7
+        ],
+        "right": [
+          12,
+          12,
+          12,
+          1
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "tie",
+      "explanation": "Equal normalized triples; singletons do not break ties."
+    },
+    {
+      "id": "probe-009",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "pares",
+        "left": [
+          7,
+          7,
+          12,
+          11
+        ],
+        "right": [
+          7,
+          7,
+          4,
+          1
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "tie",
+      "explanation": "Only the paired rank matters."
+    },
+    {
+      "id": "probe-010",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "pares",
+        "left": [
+          7,
+          7,
+          6,
+          6
+        ],
+        "right": [
+          7,
+          7,
+          5,
+          5
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "left",
+      "explanation": "High pairs tie; second pair six beats five."
+    },
+    {
+      "id": "probe-011",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "pares",
+        "left": [
+          3,
+          3,
+          3,
+          3
+        ],
+        "right": [
+          12,
+          12,
+          6,
+          6
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "left",
+      "explanation": "Four kings count as two king pairs."
+    },
+    {
+      "id": "probe-012",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "juego",
+        "left": [
+          12,
+          11,
+          10,
+          1
+        ],
+        "right": [
+          12,
+          11,
+          7,
+          5
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "left",
+      "explanation": "31 beats 32."
+    },
+    {
+      "id": "probe-013",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "juego",
+        "left": [
+          12,
+          11,
+          7,
+          5
+        ],
+        "right": [
+          12,
+          11,
+          10,
+          3
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "left",
+      "explanation": "32 beats 40."
+    },
+    {
+      "id": "probe-014",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "juego",
+        "left": [
+          12,
+          11,
+          10,
+          3
+        ],
+        "right": [
+          12,
+          11,
+          10,
+          7
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "left",
+      "explanation": "40 beats 37."
+    },
+    {
+      "id": "probe-015",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "juego",
+        "left": [
+          12,
+          11,
+          10,
+          1
+        ],
+        "right": [
+          3,
+          10,
+          11,
+          2
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "tie",
+      "explanation": "Both totals are 31; ranks do not break juego ties."
+    },
+    {
+      "id": "probe-016",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "punto",
+        "left": [
+          12,
+          11,
+          6,
+          4
+        ],
+        "right": [
+          12,
+          11,
+          5,
+          4
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "left",
+      "explanation": "30 beats 29 at punto."
+    },
+    {
+      "id": "probe-017",
+      "category": "ranking",
+      "question": "In this hypothetical comparison, which hand is stronger before any seat tie-break?",
+      "facts": {
+        "operation": "compare",
+        "lance": "punto",
+        "left": [
+          7,
+          7,
+          6,
+          4
+        ],
+        "right": [
+          12,
+          5,
+          5,
+          4
+        ],
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "left",
+        "right",
+        "tie"
+      ],
+      "expected": "tie",
+      "explanation": "Both totals equal 24."
+    },
+    {
+      "id": "probe-018",
+      "category": "hand_facts",
+      "question": "What is this hand's total?",
+      "facts": {
+        "operation": "hand_value",
+        "ranks": [
+          12,
+          11,
+          10,
+          2
+        ],
+        "field": "total",
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        31,
+        32,
+        33,
+        40
+      ],
+      "expected": 31,
+      "explanation": "The physical two contributes one."
+    },
+    {
+      "id": "probe-019",
+      "category": "hand_facts",
+      "question": "What is this hand's pair_kind?",
+      "facts": {
+        "operation": "hand_value",
+        "ranks": [
+          3,
+          12,
+          2,
+          1
+        ],
+        "field": "pair_kind",
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        "none",
+        "simple",
+        "medias",
+        "duples"
+      ],
+      "expected": "duples",
+      "explanation": "Two kings and two aces after normalization."
+    },
+    {
+      "id": "probe-020",
+      "category": "hand_facts",
+      "question": "What is this hand's has_juego?",
+      "facts": {
+        "operation": "hand_value",
+        "ranks": [
+          12,
+          11,
+          7,
+          1
+        ],
+        "field": "has_juego",
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        true,
+        false
+      ],
+      "expected": false,
+      "explanation": "Total 28 does not qualify."
+    },
+    {
+      "id": "probe-021",
+      "category": "hand_facts",
+      "question": "What is this hand's juego_points?",
+      "facts": {
+        "operation": "hand_value",
+        "ranks": [
+          12,
+          11,
+          10,
+          1
+        ],
+        "field": "juego_points",
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expected": 3,
+      "explanation": "31 has intrinsic value three."
+    },
+    {
+      "id": "probe-022",
+      "category": "hand_facts",
+      "question": "What is this hand's juego_points?",
+      "facts": {
+        "operation": "hand_value",
+        "ranks": [
+          12,
+          11,
+          7,
+          5
+        ],
+        "field": "juego_points",
+        "rank_encoding": "physical"
+      },
+      "choices": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expected": 2,
+      "explanation": "Qualifying totals other than 31 score two."
+    },
+    {
+      "id": "probe-023",
+      "category": "ranking",
+      "question": "All four revealed hands tie at grande. Which seat wins?",
+      "facts": {
+        "operation": "tie",
+        "mano": "WEST",
+        "hands": [
+          [
+            12,
+            7,
+            6,
+            1
+          ],
+          [
+            12,
+            7,
+            6,
+            1
+          ],
+          [
+            12,
+            7,
+            6,
+            1
+          ],
+          [
+            12,
+            7,
+            6,
+            1
+          ]
+        ]
+      },
+      "choices": [
+        "NORTH",
+        "EAST",
+        "SOUTH",
+        "WEST"
+      ],
+      "expected": "WEST",
+      "explanation": "First seat in priority from mano wins an exact tie."
+    },
+    {
+      "id": "probe-024",
+      "category": "ranking",
+      "question": "All four revealed hands tie at grande. Which seat wins?",
+      "facts": {
+        "operation": "tie",
+        "mano": "NORTH",
+        "hands": [
+          [
+            12,
+            7,
+            6,
+            1
+          ],
+          [
+            12,
+            7,
+            6,
+            1
+          ],
+          [
+            12,
+            7,
+            6,
+            1
+          ],
+          [
+            12,
+            7,
+            6,
+            1
+          ]
+        ]
+      },
+      "choices": [
+        "NORTH",
+        "EAST",
+        "SOUTH",
+        "WEST"
+      ],
+      "expected": "NORTH",
+      "explanation": "First seat in priority from mano wins an exact tie."
+    },
+    {
+      "id": "probe-025",
+      "category": "scoring",
+      "question": "After this opening bet is folded, how many stones are paid immediately?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            12,
+            12,
+            1
+          ],
+          [
+            10,
+            11,
+            6,
+            4
+          ],
+          [
+            10,
+            10,
+            11,
+            1
+          ],
+          [
+            7,
+            7,
+            7,
+            1
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          0,
+          0
+        ],
+        "lance": "grande",
+        "actions": [
+          [
+            "bet",
+            2
+          ],
+          [
+            "fold",
+            0
+          ]
+        ],
+        "query": "immediate_delta"
+      },
+      "choices": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected": 1,
+      "explanation": "Refusing an opening bet pays one."
+    },
+    {
+      "id": "probe-026",
+      "category": "scoring",
+      "question": "After this raise is folded, how many stones are paid immediately?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            12,
+            12,
+            1
+          ],
+          [
+            10,
+            11,
+            6,
+            4
+          ],
+          [
+            10,
+            10,
+            11,
+            1
+          ],
+          [
+            7,
+            7,
+            7,
+            1
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          0,
+          0
+        ],
+        "lance": "grande",
+        "actions": [
+          [
+            "bet",
+            2
+          ],
+          [
+            "raise",
+            6
+          ],
+          [
+            "fold",
+            0
+          ]
+        ],
+        "query": "immediate_delta"
+      },
+      "choices": [
+        1,
+        2,
+        4,
+        6
+      ],
+      "expected": 2,
+      "explanation": "A refused raise pays the previous stake, without an extra deje."
+    },
+    {
+      "id": "probe-027",
+      "category": "scoring",
+      "question": "How many stones have been paid immediately after this numeric call?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            12,
+            12,
+            1
+          ],
+          [
+            10,
+            11,
+            6,
+            4
+          ],
+          [
+            10,
+            10,
+            11,
+            1
+          ],
+          [
+            7,
+            7,
+            7,
+            1
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          0,
+          0
+        ],
+        "lance": "grande",
+        "actions": [
+          [
+            "bet",
+            40
+          ],
+          [
+            "call",
+            0
+          ]
+        ],
+        "query": "immediate_delta"
+      },
+      "choices": [
+        0,
+        1,
+        40,
+        41
+      ],
+      "expected": 0,
+      "explanation": "Even a target-sized numeric call waits for showdown."
+    },
+    {
+      "id": "probe-028",
+      "category": "action_effects",
+      "question": "What phase follows this numeric call?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            12,
+            12,
+            1
+          ],
+          [
+            10,
+            11,
+            6,
+            4
+          ],
+          [
+            10,
+            10,
+            11,
+            1
+          ],
+          [
+            7,
+            7,
+            7,
+            1
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          0,
+          0
+        ],
+        "lance": "grande",
+        "actions": [
+          [
+            "bet",
+            40
+          ],
+          [
+            "call",
+            0
+          ]
+        ],
+        "query": "phase"
+      },
+      "choices": [
+        "chica",
+        "complete",
+        "declare_pares",
+        "grande"
+      ],
+      "expected": "chica",
+      "explanation": "Numeric calls end only this lance's bidding."
+    },
+    {
+      "id": "probe-029",
+      "category": "action_effects",
+      "question": "Which action kinds may the next player choose?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            12,
+            12,
+            1
+          ],
+          [
+            10,
+            11,
+            6,
+            4
+          ],
+          [
+            10,
+            10,
+            11,
+            1
+          ],
+          [
+            7,
+            7,
+            7,
+            1
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          0,
+          0
+        ],
+        "lance": "grande",
+        "actions": [
+          [
+            "ordago",
+            0
+          ]
+        ],
+        "query": "legal_kinds"
+      },
+      "choices": [
+        [
+          "call",
+          "fold"
+        ],
+        [
+          "call",
+          "fold",
+          "raise"
+        ],
+        [
+          "pass",
+          "bet"
+        ],
+        [
+          "fold"
+        ]
+      ],
+      "expected": [
+        "call",
+        "fold"
+      ],
+      "explanation": "An outstanding ordago permits only call or fold."
+    },
+    {
+      "id": "probe-030",
+      "category": "action_effects",
+      "question": "What is the minimum legal new total stake for a numeric raise?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            12,
+            12,
+            1
+          ],
+          [
+            10,
+            11,
+            6,
+            4
+          ],
+          [
+            10,
+            10,
+            11,
+            1
+          ],
+          [
+            7,
+            7,
+            7,
+            1
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          0,
+          0
+        ],
+        "lance": "grande",
+        "actions": [
+          [
+            "bet",
+            2
+          ]
+        ],
+        "query": "minimum_raise"
+      },
+      "choices": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "expected": 4,
+      "explanation": "The v2 minimum raise increment is two."
+    },
+    {
+      "id": "probe-031",
+      "category": "action_effects",
+      "question": "Who gives the binding response to this opening bet?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            12,
+            12,
+            1
+          ],
+          [
+            10,
+            11,
+            6,
+            4
+          ],
+          [
+            10,
+            10,
+            11,
+            1
+          ],
+          [
+            7,
+            7,
+            7,
+            1
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          0,
+          0
+        ],
+        "lance": "grande",
+        "actions": [
+          [
+            "bet",
+            2
+          ]
+        ],
+        "query": "actor"
+      },
+      "choices": [
+        "NORTH",
+        "EAST",
+        "SOUTH",
+        "WEST"
+      ],
+      "expected": "NORTH",
+      "explanation": "West bets; North is the next eligible opposing seat."
+    },
+    {
+      "id": "probe-032",
+      "category": "scoring",
+      "question": "How many total points does the winning team receive for this called pares lance at ordinary showdown?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            12,
+            12,
+            1
+          ],
+          [
+            10,
+            11,
+            6,
+            4
+          ],
+          [
+            10,
+            10,
+            11,
+            1
+          ],
+          [
+            7,
+            7,
+            7,
+            1
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          0,
+          0
+        ],
+        "lance": "pares",
+        "actions": [
+          [
+            "bet",
+            4
+          ],
+          [
+            "call",
+            0
+          ]
+        ],
+        "query": "lance_points"
+      },
+      "choices": [
+        4,
+        5,
+        7,
+        9
+      ],
+      "expected": 7,
+      "explanation": "Team 0 wins: stake four + North medias two + South pair one."
+    },
+    {
+      "id": "probe-033",
+      "category": "scoring",
+      "question": "How many points does the winning team receive for this called juego lance?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            12,
+            12,
+            1
+          ],
+          [
+            11,
+            11,
+            11,
+            4
+          ],
+          [
+            10,
+            10,
+            10,
+            1
+          ],
+          [
+            7,
+            7,
+            7,
+            12
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          0,
+          0
+        ],
+        "lance": "juego",
+        "actions": [
+          [
+            "bet",
+            4
+          ],
+          [
+            "call",
+            0
+          ]
+        ],
+        "query": "lance_points"
+      },
+      "choices": [
+        4,
+        6,
+        9,
+        10
+      ],
+      "expected": 9,
+      "explanation": "West wins the 31 tie from mano; team 1 gets stake four + West three + East two."
+    },
+    {
+      "id": "probe-034",
+      "category": "scoring",
+      "question": "How many points does this called punto lance pay its winner?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            7,
+            6,
+            4
+          ],
+          [
+            11,
+            7,
+            5,
+            1
+          ],
+          [
+            10,
+            7,
+            6,
+            1
+          ],
+          [
+            12,
+            11,
+            5,
+            1
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          0,
+          0
+        ],
+        "lance": "punto",
+        "actions": [
+          [
+            "bet",
+            4
+          ],
+          [
+            "call",
+            0
+          ]
+        ],
+        "query": "lance_points"
+      },
+      "choices": [
+        4,
+        5,
+        6,
+        8
+      ],
+      "expected": 5,
+      "explanation": "Called punto adds one intrinsic point."
+    },
+    {
+      "id": "probe-035",
+      "category": "scoring",
+      "question": "How many total points does the bidding team get for this folded pares lance, including its later intrinsic award?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            12,
+            12,
+            1
+          ],
+          [
+            10,
+            11,
+            6,
+            4
+          ],
+          [
+            10,
+            10,
+            11,
+            1
+          ],
+          [
+            7,
+            7,
+            7,
+            1
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          0,
+          0
+        ],
+        "lance": "pares",
+        "actions": [
+          [
+            "bet",
+            2
+          ],
+          [
+            "fold",
+            0
+          ]
+        ],
+        "query": "lance_points"
+      },
+      "choices": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expected": 3,
+      "explanation": "West's team gets one refusal now and two for West's medias later."
+    },
+    {
+      "id": "probe-036",
+      "category": "scoring",
+      "question": "Does accepting this ordago terminate the match immediately?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            12,
+            12,
+            1
+          ],
+          [
+            10,
+            11,
+            6,
+            4
+          ],
+          [
+            10,
+            10,
+            11,
+            1
+          ],
+          [
+            7,
+            7,
+            7,
+            1
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          0,
+          0
+        ],
+        "lance": "grande",
+        "actions": [
+          [
+            "ordago",
+            0
+          ],
+          [
+            "call",
+            0
+          ]
+        ],
+        "query": "terminated"
+      },
+      "choices": [
+        true,
+        false
+      ],
+      "expected": true,
+      "explanation": "Accepted ordago decides the match now."
+    },
+    {
+      "id": "probe-037",
+      "category": "scoring",
+      "question": "Who wins when this refusal gives the bidding team its 40th stone?",
+      "facts": {
+        "operation": "transition",
+        "hypothetical_hands_N_E_S_W": [
+          [
+            12,
+            12,
+            12,
+            1
+          ],
+          [
+            10,
+            11,
+            6,
+            4
+          ],
+          [
+            10,
+            10,
+            11,
+            1
+          ],
+          [
+            7,
+            7,
+            7,
+            1
+          ]
+        ],
+        "mano": "WEST",
+        "target": 40,
+        "scores": [
+          39,
+          39
+        ],
+        "lance": "grande",
+        "actions": [
+          [
+            "bet",
+            2
+          ],
+          [
+            "fold",
+            0
+          ]
+        ],
+        "query": "scores"
+      },
+      "choices": [
+        [
+          39,
+          40
+        ],
+        [
+          40,
+          39
+        ],
+        [
+          39,
+          39
+        ],
+        [
+          40,
+          40
+        ]
+      ],
+      "expected": [
+        39,
+        40
+      ],
+      "explanation": "West belongs to team 1; refusal awards its last needed stone."
+    },
+    {
+      "id": "probe-038",
+      "category": "information",
+      "question": "Does an opening seat observation contain its partner's private hand?",
+      "facts": {
+        "operation": "visibility",
+        "query": "partner_hand",
+        "context": "Contract question; no opponent-private identities supplied"
+      },
+      "choices": [
+        true,
+        false
+      ],
+      "expected": false,
+      "explanation": "Only the observing seat's cards are supplied."
+    },
+    {
+      "id": "probe-039",
+      "category": "information",
+      "question": "Does the policy packet disclose the deal seed?",
+      "facts": {
+        "operation": "visibility",
+        "query": "seed",
+        "context": "Contract question; no opponent-private identities supplied"
+      },
+      "choices": [
+        true,
+        false
+      ],
+      "expected": false,
+      "explanation": "Seeds are evaluator provenance, not policy input."
+    },
+    {
+      "id": "probe-040",
+      "category": "information",
+      "question": "Does the policy packet disclose the stock order?",
+      "facts": {
+        "operation": "visibility",
+        "query": "stock",
+        "context": "Contract question; no opponent-private identities supplied"
+      },
+      "choices": [
+        true,
+        false
+      ],
+      "expected": false,
+      "explanation": "Stock order remains hidden."
+    },
+    {
+      "id": "probe-041",
+      "category": "information",
+      "question": "After West discards one card, how many discard rounds does West remember?",
+      "facts": {
+        "operation": "visibility",
+        "query": "own_discard_recall",
+        "context": "Contract question; no opponent-private identities supplied"
+      },
+      "choices": [
+        0,
+        1,
+        4
+      ],
+      "expected": 1,
+      "explanation": "Own discarded cards are retained privately within the hand."
+    },
+    {
+      "id": "probe-042",
+      "category": "information",
+      "question": "After West discards, how many of West's private discard rounds are in East's own recall?",
+      "facts": {
+        "operation": "visibility",
+        "query": "other_discard_recall",
+        "context": "Contract question; no opponent-private identities supplied"
+      },
+      "choices": [
+        0,
+        1,
+        4
+      ],
+      "expected": 0,
+      "explanation": "Other seats' private discard identities are not shared."
+    },
+    {
+      "id": "probe-043",
+      "category": "information",
+      "question": "After a called numeric grande, is a computed hidden-hand winner included in pending terms?",
+      "facts": {
+        "operation": "visibility",
+        "query": "pending_winner",
+        "context": "Contract question; no opponent-private identities supplied"
+      },
+      "choices": [
+        true,
+        false
+      ],
+      "expected": false,
+      "explanation": "Pending terms do not expose a hidden comparison."
+    },
+    {
+      "id": "probe-044",
+      "category": "information",
+      "question": "At the next hand, how many prior-hand public card reveals remain in the observation?",
+      "facts": {
+        "operation": "visibility",
+        "query": "past_reveals",
+        "context": "Contract question; no opponent-private identities supplied"
+      },
+      "choices": [
+        0,
+        1,
+        2,
+        4
+      ],
+      "expected": 4,
+      "explanation": "All four hands were publicly revealed; history persists."
+    },
+    {
+      "id": "probe-045",
+      "category": "information",
+      "question": "At the next hand, how many prior-hand private discard rounds remain in own_discard_history?",
+      "facts": {
+        "operation": "visibility",
+        "query": "recall_reset",
+        "context": "Contract question; no opponent-private identities supplied"
+      },
+      "choices": [
+        0,
+        1,
+        4
+      ],
+      "expected": 0,
+      "explanation": "Private discard recall is current-hand only, not perfect lifetime recall."
+    },
+    {
+      "id": "probe-046",
+      "category": "lifecycle",
+      "question": "With max_steps=1, one MUS vote consumes the limit without finishing a hand. What is the outcome?",
+      "facts": {
+        "operation": "limit",
+        "max_steps": 1
+      },
+      "choices": [
+        "terminated",
+        "truncated",
+        "winner",
+        "continuing"
+      ],
+      "expected": "truncated",
+      "explanation": "A step cap is an external truncation, never a fabricated win or completed hand."
+    }
+  ]
+}

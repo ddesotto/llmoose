@@ -23,6 +23,7 @@ def build_policies(
     strict: bool = False,
     on_record: DecisionLogger | None = None,
     prompt_version: int = PROMPT_VERSION,
+    response_mode: str = "strict",
 ) -> dict[Seat, Policy]:
     """Create one independent policy per seat.
 
@@ -51,6 +52,7 @@ def build_policies(
                 fallback_on_invalid=not strict,
                 on_record=on_record,
                 prompt_version=prompt_version,
+                response_mode=response_mode,
             )
         elif name == "random":
             policies[seat] = RandomPolicy(codec, seed + int(seat))

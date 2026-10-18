@@ -20,6 +20,9 @@ Existing task IDs are retained for links from the learning guides.
       resume (TASK-18). A recovered uncertain request can use a logged fallback.
 - [x] Individual-game terminal spectator mode and completed-game replay.
 - [x] Hand episode collection exists; no model training is implemented.
+- [x] Frozen development environment contract, 46 authored diagnostic cases,
+      model-neutral prediction grading, and separate deal allocations. See
+      [DEVELOPMENT_SUITE.md](DEVELOPMENT_SUITE.md).
 
 The benchmark runner currently handles one model pairing per invocation. A
 round-robin scheduler, combined leaderboard, Elo ratings, spending caps, and a

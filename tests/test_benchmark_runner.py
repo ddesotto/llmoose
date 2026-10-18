@@ -144,7 +144,7 @@ def test_two_models_swap_teams_with_independent_endpoints(tmp_path, monkeypatch)
             )
             return BytesIO(json.dumps({
                 "model": payload["model"],
-                "choices": [{"message": {"content": f"<answer>{chosen}</answer>"}}],
+                "choices": [{"message": {"content": json.dumps({"action_id": int(chosen)})}}],
                 "usage": {"prompt_tokens": 10, "completion_tokens": 3},
             }).encode())
 

@@ -26,7 +26,7 @@ def test_individual_seat_can_use_a_model_without_cli_or_environment_variables():
 
     def provider(messages):
         calls.append(messages)
-        return Completion("<answer>1</answer>")
+        return Completion('{"action_id": 1}' )
 
     names = {seat: "heuristic" for seat in SEATS}
     names[Seat.WEST] = "llm"
@@ -53,7 +53,7 @@ def test_model_policy_requires_an_explicit_provider():
 
 def test_model_seats_can_have_distinct_providers():
     providers = {
-        seat: (lambda messages, seat=seat: Completion("<answer>1</answer>", model=seat.name))
+        seat: (lambda messages, seat=seat: Completion('{"action_id": 1}' , model=seat.name))
         for seat in SEATS
     }
     policies = build_policies(

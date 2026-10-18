@@ -230,8 +230,8 @@ seats with the same model. Use `--step` to inspect each move; quitting happens
 before the next model request.
 
 The model receives its cards, partnership, mano position, scores, public
-history, bidding context, and the legal action IDs with descriptions. It must
-answer exactly `<answer>ID</answer>`. A forced action, such as a truthful
+history, bidding context, and the legal action IDs with descriptions. With prompt v5 it returns exactly `{"action_id": ID}` using a legal ID;
+older prompts use `<answer>ID</answer>`. A forced action, such as a truthful
 declaration, is performed without an API request.
 
 Invalid responses get up to two retries, then a logged conservative fallback.
@@ -411,27 +411,72 @@ even a 40-point match early. Use multiple seeded games for performance compariso
 
 Game instructions live in
 [`src/llmoose/agents/system_prompts/`](src/llmoose/agents/system_prompts/).
-`v1.txt` through `v3.txt` preserve the earlier instructions; **`v4.txt` is the
+`v1.txt` through `v4.txt` preserve the earlier instructions; **`v5.txt` is the
 default** and explains the player-facing context, private recall, and history policy.
 Every model uses the same selected instructions, followed by its seat/team role.
 Private cards, public history, and legal choices stay in the user message.
 
-Use `--prompt-version 1`, `2`, `3`, or `4` to select a version. Logs and reports
+Use `--prompt-version 1`, `2`, `3`, `4`, or `5` to select a version. Logs and reports
 record the prompt and renderer versions. Prompts 1–3 retain renderer 2; prompt 4
-uses renderer 3. Training renderers accept the same `prompt_version`.
+uses renderer 3; prompt 5 uses renderer 4. Training renderers accept the same `prompt_version`.
 Keep published versions unchanged: add a new `vN.txt` and register it in
 `agents/prompt.py` when changing instructions. All versions ship with the package.
 
-Renderer 3 supplies the active lance, eligible seats, tie order, bidding team,
-refusal recipient, and contextual action effects. It remembers only the acting
-seat's discards during the current hand; those cards may return through recycling.
-The current hand's public events are complete. Up to three earlier public hands
-are summarized by bids, folds, and awards, with the number omitted stated in the
-input. Past-hand card reveals and detailed actions are omitted from that summary;
-scores retain all paid awards. No hand-strength summary is supplied, so evaluating
-the private cards remains the player's task. The current hand, private cards,
-rules, and legal menu are never truncated by the renderer; very long hands may
-exceed a provider's context window.
+Renderer 4 supplies the active lance, eligible seats, tie order, bidding team,
+refusal recipient, and contextual action effects. It explicitly asks for one
+current decision and forbids continuing the game transcript. It remembers only
+the acting seat's discards during the current hand; those cards may return through
+recycling. All public history, including earlier showdown cards, remains available,
+matching the structured observation given to non-text policies. Opponents' current
+unrevealed cards, private discards, stock order, and seeds are excluded. No hand
+strength or hidden winner summary is supplied. Full history can exceed a provider's
+context window; no silent truncation is performed. Prompt 4 retains its historical
+three-hand summary and renderer 3 for reproducible comparisons.
+
+Non-text policies can consume `observations.encoding.policy_input(observation)`, a
+versioned JSON-compatible packet containing the seat observation and structured
+legal actions. `agents.decision.ActionScorePolicy(codec, scorer)` accepts a callable
+returning one finite score per codec ID and selects the highest-scoring legal ID.
+The callable can wrap a random forest, neural decision model, or another predictor;
+no LLM provider or text parser is required. Map classifier classes explicitly to
+codec IDs and version the feature transform and target-score-dependent action
+space with the model. Feature reduction is a policy choice; the shared input does
+not discard public evidence. The game engine revalidates every selected action.
+Do not give a policy the environment, spectator state, or restricted run journal.
+
+The [latest recorded-game audit](docs/game-and-prompt.md#recorded-game-review-2026-10-18)
+separates output failures, invented continuations, and transport errors. Reproduce
+its counts and source hashes with `.venv/bin/python scripts/audit_policy_inputs.py`.
+The saved Qwen/Gemini smoke suite contains four rejected Gemini responses, including
+invented votes and discard menus; none entered the engine. The separate two-model
+suite stopped on four HTTP 400 errors, whose upstream cause was not recorded.
+`testing-things` is a baseline-only run. The final v5 build completed four live mirrored games: 136 model decisions, no
+invalid responses, retries, fallbacks, or provider errors. All four journals
+validated and their deterministic replays matched. Earlier development trials
+covered eight additional games. These results measure protocol compliance, not
+optimal strategy.
+Prompt v5 was revised in place during this development session at the user's
+request. Earlier local v5 runs used XML; identify those runs by saved source and
+prompt hashes, not the version number alone. Do not resume them under changed source.
+
+Prompt v5 uses a JSON schema whose `action_id` enum is the current legal menu.
+The transport requests supported schema routing on OpenRouter, following its
+[structured output contract](https://github.com/OpenRouterTeam/docs/blob/main/guides/features/structured-outputs.mdx).
+Local validation still checks every answer before the game engine applies it.
+Provider reasoning fields remain separate from the action and are preserved in
+records; `--reasoning` requests them when supported. Some model/provider combinations
+do not support reasoning and structured output together; unsupported requests fail
+explicitly instead of silently changing experiment settings.
+
+`--llm-response-mode compatible` is an opt-in adapter for models that mix prose with
+the final answer or lack schema support. It omits the provider schema constraint
+and accepts one final JSON action object (or one final XML answer for prompts 1–4),
+with preceding explanation. It rejects multiple answers, illegal IDs, extra object
+fields, and ambiguous envelopes; it never selects numbers from prose. The full raw
+response is saved, and `normalized_responses` counts accepted nonconforming output.
+Narrative claims are not validated or added to game state. Keep compatible runs
+separate from strict compliance benchmarks. `--llm-strict` separately controls
+whether an invalid response stops play or gets retries/fallback.
 
 Request settings are `--max-tokens` (1024), `--temperature` (0), and `--timeout`
 (60 seconds). If reasoning uses up the token budget before an answer, increase
@@ -446,6 +491,11 @@ uv run --frozen llmoose-play --team-0 llm --team-1 heuristic --watch \
 
 Custom endpoints use no key unless `--api-key-env YOUR_KEY_VARIABLE` is supplied.
 Training and cloud integration plans are in [TODO.md](TODO.md).
+
+The [development suite](DEVELOPMENT_SUITE.md) freezes the environment contract and
+provides 46 rules-assisted diagnostic questions, offline checks, non-LLM prediction
+grading, and disjoint training/development/test deal allocations. Start with
+`uv run --frozen llmoose-diagnose --check`.
 
 # References
 - [RLCard](https://github.com/datamllab/rlcard),

@@ -88,6 +88,7 @@ def _manifest(args: argparse.Namespace) -> dict[str, Any]:
             "max_tokens": args.max_tokens if "llm" in (args.candidate, args.opponent) else None,
             "timeout": args.timeout if "llm" in (args.candidate, args.opponent) else None,
             "strict": not args.assisted if "llm" in (args.candidate, args.opponent) else None,
+            "response_mode": args.llm_response_mode if "llm" in (args.candidate, args.opponent) else None,
         },
         "opponent_base_url": args.opponent_base_url if args.opponent == "llm" else None,
         "pairing": "candidate plays team 0 and team 1 for every seed",
@@ -114,6 +115,7 @@ def _play_args(args: argparse.Namespace, seed: int, team: int, path: Path) -> li
     if "llm" in (args.candidate, args.opponent):
         command += [
             "--prompt-version", str(args.prompt_version),
+            "--llm-response-mode", args.llm_response_mode,
             "--temperature", str(args.temperature),
             "--max-tokens", str(args.max_tokens), "--timeout", str(args.timeout),
         ]
@@ -135,9 +137,18 @@ def _play_args(args: argparse.Namespace, seed: int, team: int, path: Path) -> li
     return command
 
 
-def _play(command: list[str]) -> None:
-    if play_command(command) == 130:
+def _play(command: list[str]) -> str | None:
+    # The CLI finalizes failed matches before exiting. Its exit status says
+    # nothing about artifact integrity: let the caller validate those artifacts.
+    try:
+        code = play_command(command)
+    except SystemExit as exc:
+        code = exc.code
+    if code == 130:
         raise KeyboardInterrupt
+    if code not in (None, 0):
+        return f"Match command exited with status {code}"
+    return None
 
 
 def _job_result(args: argparse.Namespace, seed: int, team: int, output: Path) -> dict[str, Any]:
@@ -155,9 +166,9 @@ def _job_result(args: argparse.Namespace, seed: int, team: int, output: Path) ->
                     key_env = args.api_key_env if candidate_side else args.opponent_api_key_env
                     if key_env and (args.candidate if candidate_side else args.opponent) == "llm":
                         resume += [f"--team-{assigned_team}-api-key-env", key_env]
-                _play(resume)
+                error = _play(resume)
         else:
-            _play(_play_args(args, seed, team, path))
+            error = _play(_play_args(args, seed, team, path))
         verdict = validate_run(path, allow_partial=True)
         validation_status = verdict["status"]
     except (OSError, ValueError, KeyError, TypeError, SystemExit) as exc:
@@ -179,7 +190,8 @@ def _job_result(args: argparse.Namespace, seed: int, team: int, output: Path) ->
         "run_id": result.get("run_id"),
         "validation_status": validation_status,
         "status": result.get("status", "partial"),
-        "error": error or result.get("error"),
+        "error": (error or result.get("error")) if validation_status == "invalid"
+        else (result.get("error") or error),
         "complete": complete,
         "candidate_won": result["winner"] == team if complete else None,
         "candidate_stone_margin": scores[team] - scores[1 - team] if complete else None,
@@ -262,6 +274,10 @@ def benchmark_command(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--opponent-base-url", default=OPENROUTER_BASE_URL)
     parser.add_argument("--opponent-api-key-env")
     parser.add_argument("--prompt-version", type=int, choices=PROMPT_VERSIONS, default=PROMPT_VERSION)
+    parser.add_argument(
+        "--llm-response-mode", choices=("strict", "compatible"), default="strict",
+        help="Response parsing: strict envelope (default) or compatible final envelope with extra wording",
+    )
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max-tokens", type=int, default=1024)
     parser.add_argument("--timeout", type=float, default=60.0)
@@ -281,6 +297,8 @@ def benchmark_command(argv: Sequence[str] | None = None) -> int:
             parser.error(f"{option}={model} is an example placeholder; use a real provider model ID")
     if args.assisted and "llm" not in (args.candidate, args.opponent):
         parser.error("--assisted requires an LLM policy")
+    if args.llm_response_mode != "strict" and "llm" not in (args.candidate, args.opponent):
+        parser.error("--llm-response-mode compatible requires an LLM policy")
     if "llm" in (args.candidate, args.opponent):
         load_dotenv(Path.cwd() / ".env", override=False)
         try:

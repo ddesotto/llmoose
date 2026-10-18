@@ -30,6 +30,7 @@ class StepResult:
     reward: Tuple[float, float]
     terminated: bool
     info: Mapping[str, object]
+    truncated: bool = False
 
 
 class MusEnv:
@@ -39,6 +40,11 @@ class MusEnv:
     observation itself identifies that seat, so one shared policy can be used
     for self-play or callers can route it to one of four policies. Rewards are
     per-team score changes caused by the submitted action.
+
+    ``max_steps`` truncates an unfinished episode without declaring a winner.
+    Natural termination takes priority at the limit. A truncated result retains
+    the next actor observation; both endings require reset before another step.
+    State and result info are evaluator metadata, never policy inputs.
     """
 
     def __init__(
@@ -47,7 +53,12 @@ class MusEnv:
         seed: int = 0,
         dealer: Seat = Seat.NORTH,
         episode: Union[EnvEpisode, str] = EnvEpisode.MATCH,
+        max_steps: Optional[int] = None,
     ) -> None:
+        if max_steps is not None and (type(max_steps) is not int or max_steps < 1):
+            raise ValueError("max_steps must be a positive integer or None")
+        self.max_steps = max_steps
+        self._steps = 0
         self.ruleset = ruleset or Ruleset()
         self.codec = ActionCodec(self.ruleset.target_score)
         self.seed = seed
@@ -95,6 +106,7 @@ class MusEnv:
         self._hand_start_scores = self._state.scores
         self._episode_hand = self._state.hand_number
         self._terminated = False
+        self._steps = 0
         return self._next_observation()
 
     def step(self, action: ActionInput) -> StepResult:
@@ -108,14 +120,20 @@ class MusEnv:
         )
         after = apply_action(before, structured_action)
         self._state = after
+        self._steps += 1
         reward = tuple(
             float(new - old) for new, old in zip(after.scores, before.scores)
         )
         match_over = after.phase is Phase.COMPLETE
         hand_over = match_over or after.hand_number != self._episode_hand
         terminated = match_over or (hand_over and self.episode is EnvEpisode.HAND)
-        self._terminated = terminated
+        truncated = not terminated and self.max_steps is not None and self._steps >= self.max_steps
+        self._terminated = terminated or truncated
         info = {
+            "termination_reason": (
+                "match_won" if match_over else "hand_complete" if terminated
+                else "step_limit" if truncated else None
+            ),
             "action": structured_action,
             "actor": before.current_seat,
             "scores": after.scores,
@@ -134,6 +152,7 @@ class MusEnv:
             reward=reward,
             terminated=terminated,
             info=info,
+            truncated=truncated,
         )
 
     def _next_observation(self) -> Observation:

@@ -1,0 +1,843 @@
+{
+  "action_catalog": [
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "mus"
+    },
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "no_mus"
+    },
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "pass"
+    },
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "call"
+    },
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "fold"
+    },
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "ordago"
+    },
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "declare_pares"
+    },
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "declare_no_pares"
+    },
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "declare_juego"
+    },
+    {
+      "amount": 0,
+      "card_indices": [],
+      "kind": "declare_no_juego"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        0
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        1
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        2
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        3
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        0,
+        1
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        0,
+        2
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        0,
+        3
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        1,
+        2
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        1,
+        3
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        2,
+        3
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        0,
+        1,
+        2
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        0,
+        1,
+        3
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        0,
+        2,
+        3
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        1,
+        2,
+        3
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 0,
+      "card_indices": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "kind": "discard"
+    },
+    {
+      "amount": 2,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 2,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 3,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 3,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 4,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 4,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 5,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 5,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 6,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 6,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 7,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 7,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 8,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 8,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 9,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 9,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 10,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 10,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 11,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 11,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 12,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 12,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 13,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 13,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 14,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 14,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 15,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 15,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 16,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 16,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 17,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 17,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 18,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 18,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 19,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 19,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 20,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 20,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 21,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 21,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 22,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 22,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 23,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 23,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 24,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 24,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 25,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 25,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 26,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 26,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 27,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 27,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 28,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 28,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 29,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 29,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 30,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 30,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 31,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 31,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 32,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 32,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 33,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 33,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 34,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 34,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 35,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 35,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 36,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 36,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 37,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 37,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 38,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 38,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 39,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 39,
+      "card_indices": [],
+      "kind": "raise"
+    },
+    {
+      "amount": 40,
+      "card_indices": [],
+      "kind": "bet"
+    },
+    {
+      "amount": 40,
+      "card_indices": [],
+      "kind": "raise"
+    }
+  ],
+  "contract_id": "mus-development-environment-v1",
+  "deck": [
+    {
+      "rank": 1,
+      "suit": "swords"
+    },
+    {
+      "rank": 2,
+      "suit": "swords"
+    },
+    {
+      "rank": 3,
+      "suit": "swords"
+    },
+    {
+      "rank": 4,
+      "suit": "swords"
+    },
+    {
+      "rank": 5,
+      "suit": "swords"
+    },
+    {
+      "rank": 6,
+      "suit": "swords"
+    },
+    {
+      "rank": 7,
+      "suit": "swords"
+    },
+    {
+      "rank": 10,
+      "suit": "swords"
+    },
+    {
+      "rank": 11,
+      "suit": "swords"
+    },
+    {
+      "rank": 12,
+      "suit": "swords"
+    },
+    {
+      "rank": 1,
+      "suit": "batons"
+    },
+    {
+      "rank": 2,
+      "suit": "batons"
+    },
+    {
+      "rank": 3,
+      "suit": "batons"
+    },
+    {
+      "rank": 4,
+      "suit": "batons"
+    },
+    {
+      "rank": 5,
+      "suit": "batons"
+    },
+    {
+      "rank": 6,
+      "suit": "batons"
+    },
+    {
+      "rank": 7,
+      "suit": "batons"
+    },
+    {
+      "rank": 10,
+      "suit": "batons"
+    },
+    {
+      "rank": 11,
+      "suit": "batons"
+    },
+    {
+      "rank": 12,
+      "suit": "batons"
+    },
+    {
+      "rank": 1,
+      "suit": "cups"
+    },
+    {
+      "rank": 2,
+      "suit": "cups"
+    },
+    {
+      "rank": 3,
+      "suit": "cups"
+    },
+    {
+      "rank": 4,
+      "suit": "cups"
+    },
+    {
+      "rank": 5,
+      "suit": "cups"
+    },
+    {
+      "rank": 6,
+      "suit": "cups"
+    },
+    {
+      "rank": 7,
+      "suit": "cups"
+    },
+    {
+      "rank": 10,
+      "suit": "cups"
+    },
+    {
+      "rank": 11,
+      "suit": "cups"
+    },
+    {
+      "rank": 12,
+      "suit": "cups"
+    },
+    {
+      "rank": 1,
+      "suit": "coins"
+    },
+    {
+      "rank": 2,
+      "suit": "coins"
+    },
+    {
+      "rank": 3,
+      "suit": "coins"
+    },
+    {
+      "rank": 4,
+      "suit": "coins"
+    },
+    {
+      "rank": 5,
+      "suit": "coins"
+    },
+    {
+      "rank": 6,
+      "suit": "coins"
+    },
+    {
+      "rank": 7,
+      "suit": "coins"
+    },
+    {
+      "rank": 10,
+      "suit": "coins"
+    },
+    {
+      "rank": 11,
+      "suit": "coins"
+    },
+    {
+      "rank": 12,
+      "suit": "coins"
+    }
+  ],
+  "juego_order": [
+    31,
+    32,
+    40,
+    37,
+    36,
+    35,
+    34,
+    33
+  ],
+  "lifecycle": {
+    "info_and_state": "trainer/evaluator metadata, not policy inputs",
+    "reset": "new episode; step counter cleared; caller creates fresh seat policies per match",
+    "reward": "paid team stone delta per step; not win probability",
+    "terminal_priority": "natural termination wins over a simultaneous step limit",
+    "terminated": "match winner or configured hand episode completed",
+    "truncated": "step budget exhausted without natural episode completion; no fabricated winner",
+    "truncated_observation": "next actor view retained; step requires reset afterwards",
+    "turn": "observation belongs to the next acting seat; no shared private partner memory"
+  },
+  "memory": {
+    "opponent_private_cards": "hidden_until_reveal",
+    "opponent_private_discards": "hidden",
+    "own_discards": "current_hand_only",
+    "own_hand": "current",
+    "perfect_recall": false,
+    "public_events": "full_match_including_completed_showdowns",
+    "stock_and_seed": "hidden"
+  },
+  "observation_fields": [
+    "seat",
+    "team",
+    "private_hand",
+    "phase",
+    "current_seat",
+    "scores",
+    "current_lance",
+    "discard_counts",
+    "own_discard_history",
+    "public_events",
+    "legal_action_mask",
+    "mano",
+    "hand_number",
+    "target_score",
+    "stake",
+    "bidding_team",
+    "refusal_points",
+    "lance_seats",
+    "ruleset_id",
+    "is_ordago",
+    "pending_lances"
+  ],
+  "observation_schema": 1,
+  "phases": [
+    "mus_vote",
+    "discard",
+    "grande",
+    "chica",
+    "declare_pares",
+    "pares",
+    "declare_juego",
+    "juego_or_punto",
+    "complete"
+  ],
+  "prompt": {
+    "sha256": "54fffccc157ea9281be8976b3521eac453afec5acf29fdf843d273f1090bfdde",
+    "version": 5
+  },
+  "ruleset": {
+    "bid_response_protocol": "next_opposing_seat",
+    "communication": "disabled",
+    "id": "mus_8r8a_federation_no_senas_v2",
+    "mus_protocol": "individual_unanimous",
+    "target_score": 40
+  },
+  "step_result_fields": [
+    "observation",
+    "reward",
+    "terminated",
+    "info",
+    "truncated"
+  ],
+  "teams": {
+    "EAST": 1,
+    "NORTH": 0,
+    "SOUTH": 0,
+    "WEST": 1
+  },
+  "tie_priority": {
+    "EAST": [
+      "EAST",
+      "SOUTH",
+      "WEST",
+      "NORTH"
+    ],
+    "NORTH": [
+      "NORTH",
+      "EAST",
+      "SOUTH",
+      "WEST"
+    ],
+    "SOUTH": [
+      "SOUTH",
+      "WEST",
+      "NORTH",
+      "EAST"
+    ],
+    "WEST": [
+      "WEST",
+      "NORTH",
+      "EAST",
+      "SOUTH"
+    ]
+  }
+}

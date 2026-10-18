@@ -10,16 +10,16 @@ from llmoose.game.state import Seat
 from llmoose.observations.core import Observation
 from llmoose.rules.ruleset import FEDERATION_RULESET_ID
 
-PROMPT_VERSION = 4
-PROMPT_VERSIONS = (1, 2, 3, 4)
-RENDERER_VERSION = 3
+PROMPT_VERSION = 5
+PROMPT_VERSIONS = (1, 2, 3, 4, 5)
+RENDERER_VERSION = 4
 PRIOR_HAND_SUMMARY_LIMIT = 3
 
 
 def renderer_version_for_prompt(version: int) -> int:
     if version not in PROMPT_VERSIONS:
         raise ValueError(f"Unknown prompt version: {version}")
-    return 2 if version <= 3 else RENDERER_VERSION
+    return 2 if version <= 3 else (3 if version == 4 else 4)
 
 
 @lru_cache(maxsize=None)
@@ -201,7 +201,7 @@ def _describe_action_v3(observation: Observation, action: Action) -> str:
     return f"{kind.value.replace('_', ' ')} — truthful ineligibility declaration"
 
 
-def _render_observation_v3(observation: Observation) -> str:
+def _render_observation_v3(observation: Observation, *, complete: bool = False) -> str:
     codec = ActionCodec(observation.target_score)
     if len(observation.legal_action_mask) != codec.size:
         raise ValueError("Observation mask does not match its target score")
@@ -209,7 +209,7 @@ def _render_observation_v3(observation: Observation) -> str:
     order = tuple(Seat((int(observation.mano) + offset) % 4) for offset in range(4))
     prior_events, current_events = _current_and_prior_events(observation)
     lines = [
-        f"Ruleset: {observation.ruleset_id}; renderer: {RENDERER_VERSION}",
+        f"Ruleset: {observation.ruleset_id}; renderer: {4 if complete else 3}",
         f"Hand: {observation.hand_number + 1}",
         f"You: {observation.seat.name} (team {observation.team}); partner: {partner.name}",
         f"Mano: {observation.mano.name}; tie priority: {' → '.join(seat.name for seat in order)}; mano_offset: {(observation.seat - observation.mano) % 4}",
@@ -219,7 +219,9 @@ def _render_observation_v3(observation: Observation) -> str:
         f"Eligible seats for active lance: {', '.join(seat.name for seat in observation.lance_seats) if observation.lance_seats else 'not determined yet'}",
         f"Current stake: {observation.stake}; bidding team: {observation.bidding_team}; fold awards: {observation.refusal_points}",
     ]
-    if observation.stake:
+    if complete and observation.current_lance is None:
+        lines.append("No bidding in this phase. Choose only from the legal menu below.")
+    elif observation.stake:
         lines.append(
             f"Binding response: {observation.current_seat.name} acts for their whole team on this bid; their partner cannot veto."
         )
@@ -263,12 +265,26 @@ def _render_observation_v3(observation: Observation) -> str:
     lines.append(
         f"Discard counts this hand, cumulative (North, East, South, West): {observation.discard_counts}"
     )
-    lines.extend(_prior_hand_summaries(prior_events))
+    if complete:
+        lines.append("Earlier public history (complete, including public showdown cards):")
+        for event in prior_events:
+            actor = event.actor.name if event.actor is not None else "table"
+            detail = ", ".join(f"{key}={value}" for key, value in event.detail)
+            lines.append(f"  {event.index}: {actor} {event.kind} {detail}".rstrip())
+    else:
+        lines.extend(_prior_hand_summaries(prior_events))
     lines.append("Current hand public history (complete):")
     for event in current_events:
         actor = event.actor.name if event.actor is not None else "table"
         detail = ", ".join(f"{key}={value}" for key, value in event.detail)
         lines.append(f"  {event.index}: {actor} {event.kind} {detail}".rstrip())
+    if complete:
+        lines.append(
+            f"Decision: choose exactly ONE action for {observation.seat.name} in "
+            f"{observation.phase.value}. This is a state snapshot, not a transcript to continue. "
+            "Do not simulate turns, invent cards/events, or redefine IDs. "
+            "Return only <answer>ID</answer> using the menu below."
+        )
     lines.append("Legal actions (ID: meaning):")
     lines.extend(
         f"  {action_id}: {_describe_action_v3(observation, codec.decode(action_id))}"
@@ -284,6 +300,13 @@ def render_observation(
     """Render only this seat's observation with a pinned history policy."""
     if renderer_version == 2:
         return _render_observation_v2(observation)
+    if renderer_version == 4:
+        return _render_observation_v3(observation, complete=True).replace(
+            "<answer>ID</answer>", '{"action_id": ID}'
+        ).replace(
+            "Pending lances (winner not disclosed; settle in listed order):",
+            "Pending settlement terms (hidden hand comparisons not provided):",
+        )
     if renderer_version == 3:
         return _render_observation_v3(observation)
     raise ValueError(f"Unknown renderer version: {renderer_version}")

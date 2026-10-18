@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Sequence
 from uuid import uuid4
 
+from llmoose.agents.llm import action_response_format, parse_response
 from llmoose.agents.prompt import load_system_prompt, render_messages
 from llmoose.game.actions import Action, ActionCodec, ActionKind
 from llmoose.game.engine import apply_action, legal_actions
@@ -124,6 +125,8 @@ def validate_run(directory: Path, *, allow_partial: bool = False) -> dict[str, o
         return _validate_legacy(directory)
     _verify_hashes(directory)
     manifest = json.loads(manifest_path.read_text())
+    response_mode = manifest.get("request_policy", {}).get("response_mode", "strict")
+    _require(response_mode in {"strict", "compatible"}, "Unknown response mode")
     _require(manifest.get("schema") == MANIFEST_SCHEMA, "Unknown manifest family")
     _require(manifest.get("schema_version") == SCHEMA_VERSION, "Unsupported manifest version")
     run_id = manifest["run_id"]
@@ -178,6 +181,8 @@ def validate_run(directory: Path, *, allow_partial: bool = False) -> dict[str, o
         _require(record.get("match_id") == match_id, "Match ID mismatch")
         kind = record["record_type"]
         payload = record["payload"]
+        if "response_mode" in payload:
+            _require(payload["response_mode"] == response_mode, "Recorded response mode differs from manifest")
         decision_id = record.get("decision_id")
         if kind == "run_started":
             _require(sequence == 0, "Duplicate run_started")
@@ -227,6 +232,11 @@ def validate_run(directory: Path, *, allow_partial: bool = False) -> dict[str, o
                     "Request body hash mismatch",
                 )
                 _require(payload["request_body"]["messages"] == payload["messages"], "Request messages mismatch")
+                if manifest["prompt"]["version"] >= 5 and response_mode == "strict":
+                    expected_format = action_response_format(tuple(opened[decision_id]["legal_ids"]))
+                    _require(canonical_bytes(body.get("response_format")) == canonical_bytes(expected_format), "Request action schema differs from legal IDs")
+                elif response_mode == "compatible":
+                    _require("response_format" not in body, "Compatible request unexpectedly constrained by response schema")
             if payload["attempt_number"] == 1:
                 expected_messages = render_messages(
                     observe(state, state.current_seat, codec),
@@ -241,6 +251,13 @@ def validate_run(directory: Path, *, allow_partial: bool = False) -> dict[str, o
             _require(payload["status"] in {"chosen", "invalid", "provider_error", "interrupted"}, "Unknown attempt status")
             if payload["status"] == "chosen":
                 _require(payload["chosen_id"] in opened[decision_id]["legal_ids"], "Chosen ID was not legal")
+                if manifest["prompt"]["version"] >= 5 or response_mode == "compatible":
+                    parsed_id, normalized = parse_response(
+                        payload["response"], tuple(opened[decision_id]["legal_ids"]),
+                        prompt_version=manifest["prompt"]["version"], response_mode=response_mode,
+                    )
+                    _require(type(payload["chosen_id"]) is int and parsed_id == payload["chosen_id"], "Response/chosen action mismatch")
+                    _require(payload.get("response_normalized", False) is normalized, "Response normalization flag mismatch")
             attempt_status[attempt_id] = payload["status"]
         elif kind == "decision_resolved":
             _require(decision_id in opened, "Resolution without decision")

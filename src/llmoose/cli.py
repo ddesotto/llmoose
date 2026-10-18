@@ -98,6 +98,7 @@ def _play_with_options(parser: argparse.ArgumentParser, args: argparse.Namespace
         args.team_0_model, args.team_1_model = models
         args.team_0_base_url, args.team_1_base_url = urls
         args.llm_strict = intent["strict"]
+        args.llm_response_mode = intent.get("llm_response_mode", "strict")
         args.reasoning = intent["include_reasoning"]
     teams = (args.team_0 or args.policy, args.team_1 or args.policy)
     try:
@@ -160,6 +161,7 @@ def _play_with_options(parser: argparse.ArgumentParser, args: argparse.Namespace
         "timeout": args.timeout,
         "max_steps": args.max_steps,
         "strict": args.llm_strict,
+        "llm_response_mode": args.llm_response_mode,
         "include_reasoning": args.reasoning,
     }
     if directory is not None and prefix is None:
@@ -188,6 +190,7 @@ def _play_with_options(parser: argparse.ArgumentParser, args: argparse.Namespace
         strict=args.llm_strict,
         on_record=reporter,
         prompt_version=args.prompt_version,
+        response_mode=args.llm_response_mode,
     )
     if prefix is not None:
         pending_without_attempt = (
@@ -348,6 +351,7 @@ def _play_with_options(parser: argparse.ArgumentParser, args: argparse.Namespace
                             trace_metadata[f"team_{team}_model"] = model
                     trace_metadata.update(
                         llm_strict=str(args.llm_strict),
+                        llm_response_mode=args.llm_response_mode,
                         prompt_version=str(args.prompt_version),
                         renderer_version=str(
                             renderer_version_for_prompt(args.prompt_version)
@@ -464,6 +468,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Stop at the first invalid output; no retries or fallback",
     )
     llm_options.add_argument(
+        "--llm-response-mode",
+        choices=("strict", "compatible"),
+        default="strict",
+        help="Response parsing: strict envelope (default) or compatible final envelope with extra wording",
+    )
+    llm_options.add_argument(
         "--llm-log", help="Write prompts, responses, usage, and action choices to JSONL"
     )
     llm_options.add_argument(
@@ -495,9 +505,9 @@ def _validate_options(args: argparse.Namespace, teams: tuple[str, str]) -> None:
                 raise ValueError(
                     f"--team-{team}-model, --model, or OPENROUTER_MODEL is required for an LLM player on team {team}"
                 )
-    elif args.llm_log or args.llm_strict or args.reasoning:
+    elif args.llm_log or args.llm_strict or args.reasoning or args.llm_response_mode != "strict":
         raise ValueError(
-            "--llm-log, --llm-strict, and --reasoning require an llm policy"
+            "--llm-log, --llm-strict, --reasoning, and --llm-response-mode compatible require an llm policy"
         )
     if (
         args.llm_log

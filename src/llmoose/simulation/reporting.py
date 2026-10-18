@@ -24,6 +24,7 @@ class LLMMetrics:
     requests: int = 0
     retries: int = 0
     valid_responses: int = 0
+    normalized_responses: int = 0
     invalid_outputs: int = 0
     provider_errors: int = 0
     interrupted_requests: int = 0
@@ -47,6 +48,9 @@ class LLMMetrics:
             self.requests += 1
             self.retries += int(attempt > 1)
             self.valid_responses += int(status == "chosen")
+            self.normalized_responses += int(
+                status == "chosen" and record.get("response_normalized") is True
+            )
             self.invalid_outputs += int(status == "invalid")
             self.provider_errors += int(status == "provider_error")
             self.interrupted_requests += int(status == "interrupted")

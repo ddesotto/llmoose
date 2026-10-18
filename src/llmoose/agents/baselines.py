@@ -10,15 +10,12 @@ from typing import Optional, Tuple
 from llmoose.game.actions import Action, ActionCodec, ActionKind
 from llmoose.game.state import Phase
 from llmoose.observations.core import Observation
+from llmoose.observations.encoding import legal_ids
 from llmoose.rules.hands import Lance, evaluate_hand
 
 
 def _legal_actions(observation: Observation, codec: ActionCodec) -> Tuple[Action, ...]:
-    return tuple(
-        action
-        for action, allowed in zip(codec.actions, observation.legal_action_mask)
-        if allowed
-    )
+    return tuple(codec.decode(i) for i in legal_ids(observation, codec))
 
 
 @dataclass

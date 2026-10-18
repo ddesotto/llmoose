@@ -88,6 +88,8 @@ def collect_episode(
             )
         )
         result = env.step(action)
+        if result.truncated:
+            raise RuntimeError("Hand was truncated; no completed-hand training target exists")
         if result.terminated:
             break
         observation = result.observation

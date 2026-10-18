@@ -36,6 +36,14 @@ class Action:
     card_indices: Tuple[int, ...] = ()
 
     def __post_init__(self) -> None:
+        if not isinstance(self.kind, ActionKind):
+            raise ValueError("Action kind must be an ActionKind")
+        if type(self.amount) is not int:
+            raise ValueError("Action amount must be an integer")
+        if type(self.card_indices) is not tuple or any(
+            type(index) is not int for index in self.card_indices
+        ):
+            raise ValueError("Discard indices must be a tuple of integers")
         if self.kind in {ActionKind.BET, ActionKind.RAISE} and self.amount < 2:
             raise ValueError(
                 "Bets and raises must name an absolute stake of at least 2"

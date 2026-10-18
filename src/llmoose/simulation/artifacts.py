@@ -98,6 +98,7 @@ def source_archive_bytes() -> bytes:
     """Build the reproducible local source archive without touching a run."""
     files = sorted((ROOT / "src" / "llmoose").rglob("*.py"))
     files += sorted((ROOT / "src" / "llmoose").rglob("*.txt"))
+    files += sorted((ROOT / "src" / "llmoose").rglob("*.json"))
     files += [ROOT / "pyproject.toml", ROOT / "uv.lock"]
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -192,6 +193,7 @@ def build_manifest(
             for seat in Seat
         },
         "request_policy": {
+            "response_mode": metadata.get("llm_response_mode", "strict"),
             "max_retries": 0 if metadata["strict"] else 2,
             "fallback_on_invalid": not metadata["strict"],
             "stream": False,

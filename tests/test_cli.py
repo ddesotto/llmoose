@@ -175,7 +175,7 @@ def test_llm_match_uses_openrouter_wire_format_and_saves_inspectable_decisions(
                         "model": "test/resolved",
                         "choices": [
                             {
-                                "message": {"content": f"<answer>{chosen}</answer>"},
+                                "message": {"content": json.dumps({"action_id": int(chosen)})},
                                 "finish_reason": "stop",
                             }
                         ],

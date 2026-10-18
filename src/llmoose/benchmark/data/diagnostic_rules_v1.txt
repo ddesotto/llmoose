@@ -1,0 +1,60 @@
+This is a rules-assisted diagnostic for mus_8r8a_federation_no_senas_v2,
+not a strategic game turn. Hypothetical cards explicitly supplied in a question
+are available for that question only. Physical ranks are 1,2,3,4,5,6,7,10,11,12;
+four suits each. Physical 2 compares as ace (1), and 3 compares as king (12).
+Juego values are 1 for ace/2, 10 for 3/10/11/12, and face value for other cards.
+
+North/South are team 0; East/West are team 1. Table priority is North, East,
+South, West, wrapping around from mano. The first eligible seat in that order
+starts each lance. Equal hands favor the first eligible seat in mano order.
+Each team's best eligible individual hand competes; partners' cards are not merged.
+
+Grande compares normalized ranks sorted descending, at the first difference.
+Chica compares ranks sorted ascending; lower is better at the first difference.
+Pares: duples (two pairs or four equal) beat medias (triple), which beat simple
+(one pair). Compare only pair/triple ranks. Duples compare high pair then low pair;
+four equal count as two pairs of that rank. Singletons do not break pares ties.
+Juego qualifies at total 31 or above, ordered 31,32,40,37,36,35,34,33.
+Equal juego totals tie. Punto is played only if nobody has juego; higher total wins.
+Pares/juego declarations are truthful and only eligible seats bet. If just one
+team qualifies, it wins that lance without betting. No pares means skip pares.
+
+Intrinsic points: pares simple=1, medias=2, duples=3 per eligible hand; juego
+31=3 and other qualifying totals=2. Sum the winning team's eligible hands.
+Passed grande/chica/punto pay 1. Called grande/chica pay only the numeric stake;
+called pares/juego add intrinsic values; called punto adds 1.
+
+A pass declines to open bidding but does not remove eligibility. Bets and raises
+name TOTAL stakes. Opening minimum is 2; raises increase the total by at least 2.
+The next eligible opposing seat gives one binding team response. Numeric accepted
+bets wait until ordinary showdown; a numeric bet equal to the target is not ordago.
+Folding an opening bet pays the bidding team 1 immediately. Folding a raise pays
+the previous numeric stake immediately, with no extra point. A fold also concedes
+that team's pares/juego intrinsic values or the punto point at showdown, if play
+continues. Already-paid points are not paid again. Ordinary showdown reveals all
+four hands, then settles grande, chica, pares, juego/punto, stopping when a team
+reaches the target. The displayed score contains only points already paid.
+An ordago offers an immediate showdown for the match and permits only call/fold.
+Calling it makes the best eligible hand's team win immediately, cancelling pending
+awards. Its winner's score is raised to the target, not awarded target extra points.
+Folding ordago follows the usual refusal rule.
+
+Mus votes are sequential and unanimous. Any no_mus starts grande immediately.
+After unanimous mus, each seat exchanges 1–4 cards and then voting restarts.
+Discard indices refer to the current hand; kept cards precede replacements.
+Discards may return through recycling. There is no game-rule limit on exchanges.
+
+A policy observation includes its own current cards, its own discarded cards
+within the current hand, public cumulative discard counts, public events,
+paid scores, pending public settlement terms, and the legal-action mask.
+It excludes the seed, stock order, other seats' private discards, and other seats'
+unrevealed hands. Full public history, including prior showdown cards, persists.
+Own private discard recall resets at a new hand; this is not perfect lifetime recall.
+Pending terms do not contain a hidden-hand comparison result, although a fold's
+winning team or an uncontested team may already be known publicly.
+
+An environment episode terminates on a natural match end, or a completed hand
+when hand episodes are configured. An external step budget instead truncates an
+unfinished episode, without inventing a winner or completed-hand return. Natural
+termination takes precedence if it coincides with the step limit. Reset is required
+before stepping again after either outcome.

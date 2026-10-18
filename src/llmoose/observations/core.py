@@ -23,7 +23,7 @@ class Observation:
     team: int
     private_hand: Tuple[Card, ...]
     phase: Phase
-    current_seat: Seat
+    current_seat: Optional[Seat]
     scores: Tuple[int, int]
     current_lance: Optional[Lance]
     discard_counts: Tuple[int, int, int, int]
@@ -47,6 +47,8 @@ def observe(
     seat: Seat,
     codec: ActionCodec,
 ) -> Observation:
+    if codec.size != ActionCodec(state.ruleset.target_score).size:
+        raise ValueError("Observation codec does not match ruleset target")
     return Observation(
         seat=seat,
         team=team_for(seat),

@@ -62,11 +62,16 @@ class ChatCompletionProvider:
         if not math.isfinite(self.temperature) or not 0 <= self.temperature <= 2:
             raise ValueError("Temperature must be between 0 and 2")
 
-    def __call__(self, messages: Sequence[Mapping[str, str]]) -> Completion:
+    def __call__(
+        self,
+        messages: Sequence[Mapping[str, str]],
+        *,
+        response_format: Mapping[str, object] | None = None,
+    ) -> Completion:
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        body = self.request_payload(messages)
+        body = self.request_payload(messages, response_format=response_format)
         request = Request(
             self.base_url.rstrip("/") + "/chat/completions",
             data=json.dumps(body).encode("utf-8"),
@@ -136,7 +141,12 @@ class ChatCompletionProvider:
                 "Inference response has no valid chat completion"
             ) from None
 
-    def request_payload(self, messages: Sequence[Mapping[str, str]]) -> dict[str, object]:
+    def request_payload(
+        self,
+        messages: Sequence[Mapping[str, str]],
+        *,
+        response_format: Mapping[str, object] | None = None,
+    ) -> dict[str, object]:
         """The exact JSON body sent by this transport, without authorization headers."""
         body: dict[str, object] = {
             "model": self.model,
@@ -147,4 +157,8 @@ class ChatCompletionProvider:
         }
         if self.include_reasoning:
             body["reasoning"] = {"enabled": True, "exclude": False}
+        if response_format is not None:
+            body["response_format"] = dict(response_format)
+            if urlsplit(self.base_url).hostname == "openrouter.ai":
+                body["provider"] = {"require_parameters": True}
         return body

@@ -1,5 +1,6 @@
 import json
 from dataclasses import replace
+from functools import partial
 from io import BytesIO
 from urllib.error import HTTPError, URLError
 
@@ -17,6 +18,8 @@ from llmoose.observations.core import observe
 from llmoose.rules.ruleset import Ruleset
 from llmoose.training import collect_episode
 
+# Preserve tests for the published XML output and retry contract.
+legacy_policy = partial(StructuredLLMPolicy, prompt_version=4)
 
 def opening():
     env = MusEnv(Ruleset(target_score=8), episode="hand")
@@ -117,7 +120,7 @@ def test_prior_history_is_bounded_and_current_hand_history_is_complete():
         )
         events.append(Event(len(events), "pass", Seat.WEST))
     observation = replace(observation, public_events=tuple(events), hand_number=5)
-    rendered = render_observation(observation)
+    rendered = render_observation(observation, renderer_version=3)
     assert (
         "Earlier public hands: 5 recorded; last 3 summarized; 2 older omitted."
         in rendered
@@ -170,7 +173,7 @@ def test_policy_retries_and_records_the_exact_corrective_conversation():
         calls.append([dict(message) for message in messages])
         return next(responses)
 
-    policy = StructuredLLMPolicy(env.codec, provider, on_record=records.append)
+    policy = legacy_policy(env.codec, provider, on_record=records.append)
     assert policy.act(obs).kind is ActionKind.NO_MUS
     assert len(calls[0]) == 2
     assert calls[1][-2]["content"] == "<answer>99</answer>"
@@ -186,14 +189,14 @@ def test_policy_retries_and_records_the_exact_corrective_conversation():
 def test_eval_fallback_is_explicit_and_strict_mode_stops():
     env, obs = opening()
     records = []
-    policy = StructuredLLMPolicy(
+    policy = legacy_policy(
         env.codec, lambda _: Completion("bad"), on_record=records.append
     )
     assert policy.act(obs).kind is ActionKind.NO_MUS
     assert policy.telemetry.requests == policy.telemetry.invalid_outputs == 3
     assert policy.telemetry.fallbacks == 1
     assert records[-1]["status"] == "fallback"
-    strict = StructuredLLMPolicy(
+    strict = legacy_policy(
         env.codec, lambda _: Completion("bad"), max_retries=0, fallback_on_invalid=False
     )
     with pytest.raises(InvalidModelAction):
@@ -209,7 +212,7 @@ def test_provider_failure_is_not_retried_or_replaced_by_a_game_action():
         raise ProviderError("connection failed")
 
     records = []
-    policy = StructuredLLMPolicy(env.codec, failed, on_record=records.append)
+    policy = legacy_policy(env.codec, failed, on_record=records.append)
     with pytest.raises(ProviderError):
         policy.act(obs)
     assert policy.telemetry.provider_errors == 1
@@ -226,7 +229,7 @@ def test_forced_declarations_do_not_call_the_provider():
     def unexpected(_):
         pytest.fail("Forced declaration should not call inference")
 
-    policy = StructuredLLMPolicy(codec, unexpected, on_record=records.append)
+    policy = legacy_policy(codec, unexpected, on_record=records.append)
     obs = observe(state, state.current_seat, codec)
     assert obs.legal_action_mask[codec.encode(policy.act(obs))]
     assert "truthful" in render_observation(obs)
@@ -328,7 +331,7 @@ def test_reasoning_is_preserved_separately_from_the_action(
     provider = ChatCompletionProvider(
         "model", api_key="test", include_reasoning=include_reasoning
     )
-    policy = StructuredLLMPolicy(env.codec, provider, on_record=records.append)
+    policy = legacy_policy(env.codec, provider, on_record=records.append)
     assert policy.act(observation).kind is ActionKind.NO_MUS
     body = json.loads(calls[0][0].data)
     if include_reasoning:

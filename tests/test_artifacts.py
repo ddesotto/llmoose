@@ -179,7 +179,7 @@ def test_resume_uses_saved_choice_or_explicit_fallback_without_reissuing_request
             line.strip().split(": ", 1)
             for line in messages[1]["content"].split("Legal actions (ID: meaning):\n")[1].splitlines()
         )
-        return Completion(f"<answer>{next(iter(choices))}</answer>")
+        return Completion(json.dumps({"action_id": int(next(iter(choices)))}))
 
     monkeypatch.setattr("llmoose.cli._build_provider", lambda *_, **__: provider)
     assert play_command([
@@ -323,7 +323,7 @@ def test_provider_error_before_hard_kill_resumes_with_explicit_fallback(tmp_path
     )
     def legal(messages):
         first = messages[1]["content"].split("Legal actions (ID: meaning):\n")[1].splitlines()[0]
-        return Completion(f"<answer>{first.strip().split(': ', 1)[0]}</answer>")
+        return Completion(json.dumps({"action_id": int(first.strip().split(': ', 1)[0])}))
 
     monkeypatch.setattr("llmoose.cli._build_provider", lambda *_, **__: legal)
     assert play_command(["--resume-run", str(directory)]) == 0
