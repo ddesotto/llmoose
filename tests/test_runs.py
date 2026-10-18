@@ -15,6 +15,7 @@ from llmoose.rules.ruleset import Ruleset
 from llmoose.simulation.reporting import LLMMetrics
 from llmoose.simulation.runs import score_game
 from llmoose.simulation.traces import load_trace, replay_trace
+from llmoose.simulation.validation import validate_run
 
 
 def read_lines(path):
@@ -83,6 +84,7 @@ def test_run_links_model_attempts_to_replay_and_scores(tmp_path, monkeypatch, ve
     moves = read_lines(directory / "moves.jsonl")
     trace = load_trace(directory / "match.json")
     final = replay_trace(trace)
+    assert validate_run(directory)["status"] == "finalized"
     assert report["status"] == "completed"
     assert report["prompt_version"] == version
     assert report["renderer_version"] == (2 if version <= 3 else 3)

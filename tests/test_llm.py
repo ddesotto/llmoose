@@ -161,7 +161,7 @@ def test_policy_retries_and_records_the_exact_corrective_conversation():
     responses = iter(
         [
             Completion("<answer>99</answer>"),
-            Completion(" <answer>1</answer>\n", model="actual-model"),
+            Completion(" <answer>1</answer>\n", model="actual-model", request_id="reply-456"),
         ]
     )
     calls, records = [], []
@@ -177,6 +177,7 @@ def test_policy_retries_and_records_the_exact_corrective_conversation():
     assert records[0]["messages"] == calls[0]
     assert records[1]["messages"] == calls[1]
     assert records[1]["model"] == "actual-model"
+    assert records[1]["provider_request_id"] == "reply-456"
     assert policy.telemetry.requests == 2
     assert policy.telemetry.invalid_outputs == 1
     assert policy.telemetry.fallbacks == 0
@@ -270,6 +271,7 @@ def test_openrouter_request_and_completion_metadata(monkeypatch):
     calls = install_transport(
         monkeypatch,
         {
+            "id": "response-123",
             "model": "resolved/model",
             "choices": [
                 {"message": {"content": "<answer>1</answer>"}, "finish_reason": "stop"}
@@ -286,8 +288,12 @@ def test_openrouter_request_and_completion_metadata(monkeypatch):
     assert request.get_header("Authorization") == "Bearer test-secret"
     assert json.loads(request.data)["model"] == "requested/model"
     assert json.loads(request.data)["max_tokens"] == 256
+    assert json.loads(request.data) == provider.request_payload(
+        [{"role": "user", "content": "test"}]
+    )
     assert timeout == 60
     assert result.model == "resolved/model"
+    assert result.request_id == "response-123"
     assert result.usage["cost"] == 0.001
     assert "test-secret" not in repr(provider)
 

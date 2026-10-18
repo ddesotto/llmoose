@@ -35,6 +35,9 @@ def run_match(
     dealer: Seat = Seat.NORTH,
     on_transition: Optional[TransitionObserver] = None,
     on_turn: Optional[Callable[[GameState], None]] = None,
+    on_action_selected: Optional[Callable[[GameState, Action], None]] = None,
+    initial_state: Optional[GameState] = None,
+    initial_actions: Sequence[Action] = (),
 ) -> MatchResult:
     """Run four policies, optionally reporting each transition to a spectator.
 
@@ -44,9 +47,15 @@ def run_match(
 
     if set(policies) != set(SEATS):
         raise ValueError("A match needs exactly one policy for every seat")
-    state = new_game(seed=seed, ruleset=ruleset, dealer=dealer)
+    if initial_actions and initial_state is None:
+        raise ValueError("An action prefix requires its replayed state")
+    if initial_state is not None and (
+        initial_state.seed != seed or ruleset is not None and initial_state.ruleset != ruleset
+    ):
+        raise ValueError("Initial state does not match the requested match")
+    state = initial_state or new_game(seed=seed, ruleset=ruleset, dealer=dealer)
     codec = ActionCodec(state.ruleset.target_score)
-    actions = []
+    actions = list(initial_actions)
     while state.phase is not Phase.COMPLETE:
         if len(actions) >= max_steps:
             raise RuntimeError("Match exceeded max_steps without reaching a winner")
@@ -56,6 +65,8 @@ def run_match(
         if on_turn is not None:
             on_turn(state)
         action = policies[actor].act(observe(state, actor, codec))
+        if on_action_selected is not None:
+            on_action_selected(state, action)
         before = state
         state = apply_action(state, action)
         actions.append(action)

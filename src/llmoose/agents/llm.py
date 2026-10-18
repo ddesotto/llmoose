@@ -14,12 +14,15 @@ from llmoose.agents.prompt import (
     render_messages,
     renderer_version_for_prompt,
 )
-from llmoose.agents.providers import Completion, ProviderError
+from llmoose.agents.providers import ChatCompletionProvider, Completion, ProviderError
 from llmoose.game.actions import Action, ActionCodec
 from llmoose.observations.core import Observation
 
 LLMProvider = Callable[[Sequence[Mapping[str, str]]], Completion]
 DecisionLogger = Callable[[dict[str, object]], None]
+AttemptStartLogger = Callable[
+    [Observation, int, Sequence[Mapping[str, str]], Mapping[str, object] | None], None
+]
 
 
 class InvalidModelAction(RuntimeError):
@@ -53,6 +56,7 @@ class StructuredLLMPolicy:
     max_retries: int = 2
     fallback_on_invalid: bool = True
     on_record: DecisionLogger | None = None
+    on_attempt_start: AttemptStartLogger | None = None
     prompt_version: int = PROMPT_VERSION
     telemetry: PolicyTelemetry = field(default_factory=PolicyTelemetry, init=False)
 
@@ -96,6 +100,15 @@ class StructuredLLMPolicy:
             return self.codec.decode(legal_ids[0])
         for attempt in range(self.max_retries + 1):
             self.telemetry.requests += 1
+            if self.on_attempt_start is not None:
+                request_body = (
+                    self.provider.request_payload(messages)
+                    if isinstance(self.provider, ChatCompletionProvider)
+                    else None
+                )
+                self.on_attempt_start(
+                    observation, attempt + 1, messages, request_body
+                )
             started = perf_counter()
             try:
                 completion = self.provider(messages)
@@ -121,6 +134,7 @@ class StructuredLLMPolicy:
                 "reasoning": completion.reasoning,
                 "reasoning_details": list(completion.reasoning_details),
                 "model": completion.model,
+                "provider_request_id": completion.request_id,
                 "finish_reason": completion.finish_reason,
                 "usage": dict(completion.usage),
                 "attempt": attempt + 1,

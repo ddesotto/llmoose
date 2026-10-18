@@ -114,30 +114,31 @@ without source code or assumed familiarity with a different Mus variant.
 
 **Depends on:** existing recording; coordinate semantics with TASK-09/10.
 **Guide:** [artifacts and traces](docs/artifacts.md).
+**Format contract:** [run evidence](ARTIFACT_FORMAT.md).
 
 Core recording gate:
 
-- [ ] Define a canonical versioned experiment manifest, written before requests,
+- [x] Define a canonical versioned experiment manifest, written before requests,
       and linked decision/attempt/transition/outcome records. Record observations,
       exact messages, structured actions, legal IDs, rewards, and provenance.
-- [ ] Use stable run, match, hand, seat, decision, attempt, and event identifiers.
+- [x] Use stable run, match, hand, seat, decision, attempt, and event identifiers.
       Record all policies' decisions, not only LLM calls; distinguish forced,
       sampled, retried, fallback, failed, interrupted, and unapplied responses.
-- [ ] Preserve raw v1 `match.json`, `moves.jsonl`, `decisions.jsonl`, and `report.json`.
+- [x] Preserve raw v1 `match.json`, `moves.jsonl`, `decisions.jsonl`, and `report.json`.
       Add readers/migrations rather than rewriting evidence. Backfill only facts
       justified by old files, marking unavailable fields unknown.
-- [ ] Separate evaluator-only state/seed/replay data from seat-visible inputs.
+- [x] Separate evaluator-only state/seed/replay data from seat-visible inputs.
       A seed can reconstruct hidden hands and must not enter a player prompt or
       ordinary student input. Keep each seat's private trace scoped to that seat.
-- [ ] Store engine/code and dirty-worktree provenance, rules, prompt/renderer/codec
+- [x] Store engine/code and dirty-worktree provenance, rules, prompt/renderer/codec
       versions, model/tokenizer revisions, dependency lock, parameters, and hashes.
       Capture provider-returned identifiers and usage without secrets.
-- [ ] Define append durability, request-start records, crash-safe finalization,
-      partial-line recovery, idempotent resume, terminal/truncated status, and checksums.
-      Flushing Python buffers alone is not durable storage against every failure.
-- [ ] Add validation tools: replay consistency, log joins, mask legality,
+- [x] Define append durability, request-start records, crash-safe finalization,
+      partial-line recovery, idempotent recovery verdicts, terminal/truncated
+      status, and checksums. Journal records are fsynced before provider calls.
+- [x] Add validation tools: replay consistency, log joins, mask legality,
       score deltas, missing attempts, schema versions, and hidden-information boundaries.
-- [ ] Define local run/data/model/evaluation directories, retention, compression,
+- [x] Define local run/data/model/evaluation directories, retention, compression,
       backup, indexing, and eventual object-store publishing. Keep small examples
       in Git and large/private experiment artifacts in managed storage.
 
@@ -150,6 +151,12 @@ Downstream adapters, delivered with TASK-13/14/15 and TASK-04:
 **Core done when:** an experiment can be inspected, replayed, audited, resumed or
 explicitly marked partial with traceable provenance. Export acceptance is checked
 with the corresponding training task, not required to start benchmarking.
+
+Further hardening:
+
+- [x] Continue an unfinished match from a validated action prefix with the same
+      source snapshot. Preserve uncertain provider outcomes and use an explicit
+      recovery fallback without silently resending a request.
 
 ## TASK-11 — MooseBench protocol and model configuration
 

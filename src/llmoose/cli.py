@@ -14,7 +14,9 @@ from uuid import uuid4
 
 from dotenv import load_dotenv
 
+from llmoose.agents.baselines import ConservativePolicy, RandomPolicy
 from llmoose.agents.factory import POLICY_NAMES, build_policies
+from llmoose.agents.llm import StructuredLLMPolicy
 from llmoose.agents.prompt import (
     PROMPT_VERSION,
     PROMPT_VERSIONS,
@@ -22,13 +24,22 @@ from llmoose.agents.prompt import (
 )
 from llmoose.agents.providers import OPENROUTER_BASE_URL, ChatCompletionProvider
 from llmoose.game.actions import ActionCodec
-from llmoose.game.state import SEATS, new_game, team_for
+from llmoose.game.engine import apply_action
+from llmoose.game.state import SEATS, Seat, new_game, team_for
+from llmoose.observations.core import observe
 from llmoose.rules.ruleset import FEDERATION_RULESET_ID, RULESET_IDS, Ruleset
 from llmoose.simulation.match import run_match
 from llmoose.simulation.reporting import DecisionReporter, llm_summary, match_summary
 from llmoose.simulation.runs import RunRecorder
 from llmoose.simulation.terminal import TerminalSpectator
 from llmoose.simulation.traces import save_trace, trace_from_match
+from llmoose.simulation.validation import (
+    load_resume_prefix,
+    reconcile_move_log,
+    resume_lock,
+    trim_torn_decision_log,
+    trim_torn_journal,
+)
 
 
 def play_command(argv: Optional[Sequence[str]] = None) -> int:
@@ -36,6 +47,45 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
     load_dotenv(Path.cwd() / ".env", override=False)
     parser = _build_parser()
     args = parser.parse_args(argv)
+    if args.resume_run:
+        supplied = list(argv) if argv is not None else sys.argv[1:]
+        allowed = {"--resume-run", "--watch", "--step", "--delay", "--api-key-env"}
+        unexpected = [
+            token.split("=", 1)[0]
+            for token in supplied
+            if token.startswith("--") and token.split("=", 1)[0] not in allowed
+        ]
+        if unexpected:
+            parser.error(f"--resume-run uses the original run settings; omit {unexpected[0]}")
+        try:
+            with resume_lock(Path(args.resume_run)):
+                return _play_with_options(parser, args)
+        except (OSError, ValueError) as exc:
+            parser.error(f"Cannot resume run: {exc}")
+    return _play_with_options(parser, args)
+
+
+def _play_with_options(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    prefix = None
+    if args.resume_run:
+        if args.run_dir or args.trace or args.llm_log:
+            parser.error("--resume-run owns its existing files; omit --run-dir, --trace, and --llm-log")
+        try:
+            prefix = load_resume_prefix(Path(args.resume_run))
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            parser.error(f"Cannot resume run: {exc}")
+        intent = prefix.manifest["intent"]
+        for key in (
+            "seed", "target_score", "max_steps", "prompt_version", "temperature",
+            "max_tokens", "timeout",
+        ):
+            setattr(args, key, intent[key])
+        args.ruleset = prefix.manifest["ruleset"]["id"]
+        args.team_0, args.team_1 = intent["teams"]
+        args.model = intent["requested_model"]
+        args.base_url = intent["base_url"] or OPENROUTER_BASE_URL
+        args.llm_strict = intent["strict"]
+        args.reasoning = intent["include_reasoning"]
     teams = (args.team_0 or args.policy, args.team_1 or args.policy)
     try:
         _validate_options(args, teams)
@@ -43,9 +93,12 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
     except ValueError as exc:
         parser.error(str(exc))
 
-    ruleset = Ruleset(id=args.ruleset, target_score=args.target_score)
-    directory = Path(args.run_dir) if args.run_dir else None
-    if directory is not None:
+    ruleset = (
+        prefix.state.ruleset if prefix is not None
+        else Ruleset(id=args.ruleset, target_score=args.target_score)
+    )
+    directory = Path(args.resume_run or args.run_dir) if args.resume_run or args.run_dir else None
+    if directory is not None and prefix is None:
         try:
             directory.mkdir(parents=True, exist_ok=False)
         except OSError as exc:
@@ -53,7 +106,14 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
         args.trace = str(directory / "match.json")
         if provider is not None:
             args.llm_log = str(directory / "decisions.jsonl")
-    metadata = {
+    elif prefix is not None:
+        args.trace = str(directory / "match.json")
+        if provider is not None:
+            args.llm_log = str(directory / "decisions.jsonl")
+        trim_torn_journal(directory, prefix)
+        reconcile_move_log(directory, prefix)
+        trim_torn_decision_log(directory)
+    metadata = dict(prefix.manifest["intent"]) if prefix is not None else {
         "seed": args.seed,
         "target_score": args.target_score,
         "ruleset": asdict(ruleset),
@@ -69,9 +129,24 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
         "strict": args.llm_strict,
         "include_reasoning": args.reasoning,
     }
-    if directory is not None:
+    if directory is not None and prefix is None:
         metadata["run_id"] = uuid4().hex
-    reporter = DecisionReporter(args.llm_log, metadata)
+    reporter = DecisionReporter(args.llm_log, metadata, append=prefix is not None)
+    if prefix is not None:
+        finished_attempts = {
+            row["payload"]["attempt_id"]
+            for row in prefix.records if row["record_type"] == "attempt_finished"
+        }
+        for row in prefix.records:
+            if row["record_type"] in {"attempt_finished", "decision_resolved"}:
+                reporter.restore(row["payload"])
+            elif row["record_type"] == "attempt_started":
+                payload = row["payload"]
+                if payload["attempt_id"] not in finished_attempts:
+                    reporter.restore({
+                        "seat": payload["seat"], "attempt": payload["attempt_number"],
+                        "status": "outcome_unknown",
+                    })
     policies = build_policies(
         {seat: teams[team_for(seat)] for seat in SEATS},
         ActionCodec(ruleset.target_score),
@@ -81,16 +156,77 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
         on_record=reporter,
         prompt_version=args.prompt_version,
     )
+    if prefix is not None:
+        pending_without_attempt = (
+            prefix.pending_decision_id is not None
+            and not any(
+                row.get("decision_id") == prefix.pending_decision_id
+                and row["record_type"] in {"attempt_started", "decision_resolved"}
+                for row in prefix.records
+            )
+        )
+        for row in prefix.records:
+            kind, payload = row["record_type"], row["payload"]
+            seat = payload.get("seat")
+            policy = policies.get(Seat(seat)) if seat is not None else None
+            if not isinstance(policy, StructuredLLMPolicy):
+                continue
+            counts = policy.telemetry
+            if kind == "decision_opened":
+                counts.decisions += 1
+            elif kind == "attempt_started":
+                counts.requests += 1
+            elif kind == "attempt_finished":
+                counts.invalid_outputs += int(payload["status"] == "invalid")
+                counts.provider_errors += int(payload["status"] == "provider_error")
+            elif kind == "decision_resolved":
+                counts.forced_actions += int(payload["status"] == "forced")
+                counts.fallbacks += int(payload["status"] in {"fallback", "recovery_fallback"})
+        if pending_without_attempt:
+            actor = prefix.state.current_seat
+            policy = policies[actor]
+            if isinstance(policy, StructuredLLMPolicy):
+                policy.telemetry.decisions -= 1
+        state = new_game(args.seed, ruleset)
+        codec = ActionCodec(ruleset.target_score)
+        for recorded in prefix.records:
+            if recorded["record_type"] != "action_applied":
+                continue
+            payload = recorded["payload"]
+            action = codec.decode(payload["action_id"])
+            actor = state.current_seat
+            if payload["source"] == "sampled":
+                policy = policies[actor]
+                assert isinstance(policy, RandomPolicy)
+                if policy.act(observe(state, actor, codec)) != action:
+                    parser.error("Random policy sequence differs from recorded run")
+            state = apply_action(state, action)
     spectator = _build_spectator(args, teams, provider is not None)
     recorder = (
-        RunRecorder(directory, new_game(args.seed, ruleset), metadata, reporter)
+        RunRecorder(
+            directory,
+            prefix.state if prefix is not None else new_game(args.seed, ruleset),
+            metadata,
+            reporter,
+            resume_records=list(prefix.records) if prefix is not None else None,
+        )
         if directory is not None
         else None
     )
-    action_count = 0
+    if prefix is not None:
+        recorder.action_count = len(prefix.actions)
+    if recorder is not None:
+        reporter.on_journal = recorder.on_policy_record
+        for policy in policies.values():
+            if isinstance(policy, StructuredLLMPolicy):
+                policy.on_attempt_start = recorder.on_attempt_start
+    action_count = len(prefix.actions) if prefix is not None else 0
+    reporter.action_index = action_count
 
     def before_action(state):
         reporter.action_index = action_count
+        if recorder is not None:
+            recorder.on_turn(state)
         if spectator is not None:
             spectator.before_action(state)
 
@@ -104,6 +240,56 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         with reporter, recorder if recorder is not None else nullcontext():
+            initial_state = prefix.state if prefix is not None else None
+            initial_actions = prefix.actions if prefix is not None else ()
+            if prefix is not None and prefix.pending_decision_id is not None:
+                pending = [
+                    row for row in prefix.records
+                    if row.get("decision_id") == prefix.pending_decision_id
+                ]
+                selected = [
+                    row["payload"] for row in pending
+                    if row["record_type"] == "action_selected"
+                ]
+                choices = [
+                    row["payload"] for row in pending
+                    if row["record_type"] in {"attempt_finished", "decision_resolved"}
+                    and row["payload"]["status"] in {"chosen", "forced", "fallback", "recovery_fallback"}
+                ]
+                if selected:
+                    action = ActionCodec(ruleset.target_score).decode(selected[-1]["action_id"])
+                    if selected[-1]["source"] == "sampled":
+                        actor = initial_state.current_seat
+                        policy = policies[actor]
+                        assert isinstance(policy, RandomPolicy)
+                        if policy.act(observe(initial_state, actor, ActionCodec(ruleset.target_score))) != action:
+                            raise RuntimeError("Pending random choice differs from recorded selection")
+                elif choices:
+                    action = ActionCodec(ruleset.target_score).decode(choices[-1]["chosen_id"])
+                elif any(row["record_type"] == "attempt_started" for row in pending):
+                    actor = initial_state.current_seat
+                    action = ConservativePolicy(ActionCodec(ruleset.target_score)).act(
+                        observe(initial_state, actor, ActionCodec(ruleset.target_score))
+                    )
+                    reporter({
+                        "seat": int(actor),
+                        "status": "recovery_fallback",
+                        "attempt": max(
+                            row["payload"]["attempt_number"]
+                            for row in pending if row["record_type"] == "attempt_started"
+                        ),
+                        "chosen_id": ActionCodec(ruleset.target_score).encode(action),
+                        "recovery_reason": "pending model decision; no request was reissued",
+                    })
+                else:
+                    action = None
+                if action is not None:
+                    if not selected:
+                        recorder.on_action_selected(initial_state, action)
+                    after = apply_action(initial_state, action)
+                    after_action(initial_state, action, after)
+                    initial_state = after
+                    initial_actions = (*initial_actions, action)
             result = run_match(
                 policies,
                 args.seed,
@@ -111,6 +297,9 @@ def play_command(argv: Optional[Sequence[str]] = None) -> int:
                 args.max_steps,
                 on_transition=after_action,
                 on_turn=before_action,
+                on_action_selected=recorder.on_action_selected if recorder is not None else None,
+                initial_state=initial_state,
+                initial_actions=initial_actions,
             )
             if args.trace:
                 trace_metadata = {
@@ -187,6 +376,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--run-dir",
         help="Create a new directory with moves, LLM logs, replay, and scores",
+    )
+    parser.add_argument(
+        "--resume-run",
+        help="Continue a validated partial v2 run from its committed action prefix",
     )
     llm_options = parser.add_argument_group("LLM player (OpenRouter by default)")
     llm_options.add_argument(

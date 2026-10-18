@@ -25,6 +25,7 @@ class Completion:
     usage: Mapping[str, object] = field(default_factory=dict)
     reasoning: str | None = None
     reasoning_details: tuple[Mapping[str, object], ...] = ()
+    request_id: str | None = None
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -65,15 +66,7 @@ class ChatCompletionProvider:
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        body = {
-            "model": self.model,
-            "messages": list(messages),
-            "stream": False,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-        }
-        if self.include_reasoning:
-            body["reasoning"] = {"enabled": True, "exclude": False}
+        body = self.request_payload(messages)
         request = Request(
             self.base_url.rstrip("/") + "/chat/completions",
             data=json.dumps(body).encode("utf-8"),
@@ -126,6 +119,9 @@ class ChatCompletionProvider:
                 not isinstance(d, dict) for d in details
             ):
                 raise TypeError
+            request_id = payload.get("id")
+            if request_id is not None and not isinstance(request_id, str):
+                raise TypeError
             return Completion(
                 content,
                 payload.get("model", self.model),
@@ -133,8 +129,22 @@ class ChatCompletionProvider:
                 usage,
                 reasoning,
                 tuple(details),
+                request_id,
             )
         except (KeyError, IndexError, TypeError, AttributeError):
             raise ProviderError(
                 "Inference response has no valid chat completion"
             ) from None
+
+    def request_payload(self, messages: Sequence[Mapping[str, str]]) -> dict[str, object]:
+        """The exact JSON body sent by this transport, without authorization headers."""
+        body: dict[str, object] = {
+            "model": self.model,
+            "messages": list(messages),
+            "stream": False,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+        }
+        if self.include_reasoning:
+            body["reasoning"] = {"enabled": True, "exclude": False}
+        return body

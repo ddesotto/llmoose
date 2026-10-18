@@ -27,6 +27,7 @@ class LLMMetrics:
     invalid_outputs: int = 0
     provider_errors: int = 0
     interrupted_requests: int = 0
+    unknown_outcomes: int = 0
     fallbacks: int = 0
     first_try_legal: int = 0
     request_seconds: float = 0.0
@@ -40,7 +41,7 @@ class LLMMetrics:
             self.decisions += 1
         if status == "forced":
             self.forced_actions += 1
-        elif status == "fallback":
+        elif status in {"fallback", "recovery_fallback"}:
             self.fallbacks += 1
         else:
             self.requests += 1
@@ -49,6 +50,7 @@ class LLMMetrics:
             self.invalid_outputs += int(status == "invalid")
             self.provider_errors += int(status == "provider_error")
             self.interrupted_requests += int(status == "interrupted")
+            self.unknown_outcomes += int(status == "outcome_unknown")
             self.first_try_legal += int(status == "chosen" and attempt == 1)
             self.request_seconds += record.get("latency_seconds", 0.0)
             usage = record.get("usage", {})
@@ -107,7 +109,9 @@ class LLMMetrics:
 class DecisionReporter:
     """A policy callback whose optional JSONL file is owned by a with block."""
 
-    def __init__(self, path: str | None, metadata: Mapping[str, object]) -> None:
+    def __init__(
+        self, path: str | None, metadata: Mapping[str, object], *, append: bool = False
+    ) -> None:
         self.path = Path(path) if path else None
         self.metadata = dict(metadata)
         self._handle: TextIO | None = None
@@ -116,11 +120,13 @@ class DecisionReporter:
         self.by_seat: dict[int, LLMMetrics] = {}
         self.by_team: dict[int, LLMMetrics] = {}
         self.models: set[str] = set()
+        self.on_journal = None
+        self.append = append
 
     def __enter__(self) -> DecisionReporter:
         if self.path is not None:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self._handle = self.path.open("w", encoding="utf-8")
+            self._handle = self.path.open("a" if self.append else "w", encoding="utf-8")
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
@@ -129,12 +135,9 @@ class DecisionReporter:
             self._handle = None
 
     def __call__(self, record: dict[str, object]) -> None:
-        seat = record["seat"]
-        self.total.add(record)
-        self.by_seat.setdefault(seat, LLMMetrics()).add(record)
-        self.by_team.setdefault(seat % 2, LLMMetrics()).add(record)
-        if record.get("model"):
-            self.models.add(record["model"])
+        if self.on_journal is not None:
+            self.on_journal(record)
+        self.restore(record)
         if self._handle is not None:
             self._handle.write(
                 json.dumps(
@@ -148,14 +151,22 @@ class DecisionReporter:
                 )
                 + "\n"
             )
-
             self._handle.flush()
-        if record["status"] in {"invalid", "fallback"}:
+        if record["status"] in {"invalid", "fallback", "recovery_fallback"}:
             print(
                 f"LLM seat {record['seat']}: {record['status']} (attempt {record['attempt']})",
                 file=sys.stderr,
                 flush=True,
             )
+
+    def restore(self, record: Mapping[str, object]) -> None:
+        """Rebuild metrics from committed records without writing or re-emitting them."""
+        seat = record["seat"]
+        self.total.add(record)
+        self.by_seat.setdefault(seat, LLMMetrics()).add(record)
+        self.by_team.setdefault(seat % 2, LLMMetrics()).add(record)
+        if record.get("model"):
+            self.models.add(record["model"])
 
     def metrics(self) -> dict[str, object]:
         return {

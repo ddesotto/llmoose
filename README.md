@@ -254,10 +254,54 @@ Records are saved as the match runs; each invocation overwrites the file.
 | `moves.jsonl` | Every applied move, public events, and before/after scores, flushed during play |
 | `match.json` | Deterministic replay of a completed match |
 | `report.json` | Run settings, completion status, automatic game scores, and LLM metrics |
+| `manifest.json` | Versioned run intent, rules, policy identities, codec/prompt hashes, seeds, and source provenance; written before play |
+| `source.zip` | Exact local Python/package/lockfile snapshot used by this run |
+| `records.jsonl` | Fsynced, linked decision, request, selected/applied action, and outcome journal |
+| `result.json` / `checksums.json` | Atomic final status and artifact hashes |
 
 Existing run directories are rejected to protect earlier experiments. Use a new
 name for each run. `--run-dir` supplies the log and trace paths; do not combine it
 with `--llm-log` or `--trace`.
+
+The new journal is **restricted evidence**: its manifest and replay seed can reveal
+hidden deals, and its decision records contain private cards. Give policies only
+their seat observations. Earlier four-file runs remain readable without rewriting
+them. Check a run with:
+
+```bash
+uv run --frozen llmoose-validate runs/llm-seed-12
+uv run --frozen llmoose-validate runs/llm-seed-12 --save
+```
+
+If a process was killed before finalization, `llmoose-validate RUN --recover`
+reads complete journal lines and writes a separate partial verdict, or finishes
+an already-recorded final result. It never repeats an uncertain model request.
+`--save` writes `validation.json` with the verdict and source file hashes.
+
+To continue a partial match with the same installed source and lockfile:
+
+```bash
+uv run --frozen llmoose-play --resume-run runs/llm-seed-12
+```
+
+Continuation replays committed actions, restores random-policy progress, and
+appends to the same run. Every chosen action is journaled before engine
+application; a choice saved at a crash boundary is applied once on resume.
+A saved legal model answer is used without a new request. If a model request
+was started but has no recorded answer, continuation
+uses an explicitly logged conservative `recovery_fallback`; it does not resend
+the uncertain request. Torn journal bytes and any v1 move log repaired from the
+journal are kept as `.bin` backups. Resume refuses changed source code; the
+engine-independent `read_evidence()` adapter can still inspect v1/v2 records
+and preserves unknown optional v2 fields. It cannot make changed game rules
+replay identically.
+The [format contract](ARTIFACT_FORMAT.md) defines versioning and crash boundaries.
+
+Store raw private runs under ignored `runs/`; use ignored `artifacts/` for
+derived datasets, evaluations, and checkpoints. Keep a raw run while a result
+or dataset depends on it. Archive and verify finalized runs before moving them
+to access-controlled managed storage; keep only small synthetic examples in
+Git. The storage and retention plan is described in [the artifact guide](docs/artifacts.md).
 
 The report scores each partnership with **1 for a win, 0 for a loss**, plus its
 stones, stone differential, and per-lance wins and points. Lance results include
